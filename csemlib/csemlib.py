@@ -3,4 +3,5 @@ import click
 
 @click.group()
 def cli():
-    pass
+
+    return 'Running'
