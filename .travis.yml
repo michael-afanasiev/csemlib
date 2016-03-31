@@ -31,7 +31,11 @@ install:
   # Dependencies
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest
   - source activate test-environment
+  - pip install codecov
   - python setup.py install
 
 script:
-  - py.test
+  - py.test --cov=./
+
+after_success:
+  - codecov
