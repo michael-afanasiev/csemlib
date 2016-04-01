@@ -1,11 +1,7 @@
-from click.testing import CliRunner
-
 from csemlib import csemlib
 
 
 def test_main():
-    '''Dumb test.'''
+    """Dumb test."""
 
-    runner = CliRunner()
-    result = runner.invoke(csemlib.cli)
-    assert True
+    assert csemlib._coverage_func() == 7

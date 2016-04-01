@@ -1,8 +1,10 @@
 import click
 
+def _coverage_func():
+
+    return 7
 
 @click.group()
 def cli():
 
-    print("WELCOME.")
-    return 'Running'
+    pass
