@@ -32,10 +32,10 @@ install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest
   - source activate test-environment
   - pip install pytest-cov codecov
-  - python setup.py install
+  - pip install -v -e .
 
 script:
-  - py.test --cov
+  - py.test --cov=csemlib tests/
 
 after_success:
   - codecov
