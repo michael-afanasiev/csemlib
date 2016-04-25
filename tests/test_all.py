@@ -1,6 +1,7 @@
 import numpy as np
 
 import csemlib.background.skeleton as skl
+import csemlib.models.crust as crust
 import csemlib.models.one_dimensional as m1d
 
 
@@ -18,6 +19,10 @@ def test_fibonacci_sphere():
 
 
 def test_prem_no220():
+    """
+    Test to (mainly) make sure that discontinuities are handled properly.
+    :return:
+    """
     reg01 = np.array([3.374814283471982, 8.076866567257888, 4.4708837074242656, 4.570983707424266])
     reg02 = np.array([3.363837607910846, 8.014433950714174, 4.433659080207189, 4.422659080207189])
     reg03 = np.array([3.495466943964841, 8.751316606498193, 4.7139374352534915, 4.7139374352534915])
@@ -47,3 +52,26 @@ def test_prem_no220():
     np.testing.assert_allclose(m1d.prem_no220(3480, region='outer_core'), reg12)
     np.testing.assert_allclose(m1d.prem_no220(1221.5, region='outer_core'), reg13)
     np.testing.assert_allclose(m1d.prem_no220(1221.5, region='inner_core'), reg14)
+
+
+def test_crust():
+    """
+    Test to ensure that the crust returns correct values.
+    """
+
+    proper_dep = np.array([[38.69471863, 17.96798953],
+                           [38.69471863, 17.96798953]])
+    proper_vs = np.array([[3.64649739, 3.1255109],
+                          [3.64649739, 3.1255109]])
+
+    cst = crust.Crust()
+    cst.read()
+
+    x = np.radians([179, 1])
+    y = np.radians([1, 1])
+    lats, lons = np.meshgrid(x, y)
+    vals_dep = cst.eval(lats, lons, param='crust_dep')
+    vals_vs = cst.eval(lats, lons, param='crust_vs')
+
+    np.testing.assert_allclose(vals_dep, proper_dep)
+    np.testing.assert_allclose(vals_vs, proper_vs)

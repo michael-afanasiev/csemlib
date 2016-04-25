@@ -1,13 +1,11 @@
 import abc
-import os
-
-import xarray
 
 
-class Model(metaclass=abc.ABCMeta):
+class Model():
     """
     An abstract base class handling an external Earth model.
     """
+    __metaclass__ = abc.ABCMeta
 
     def __init__(self):
         pass
@@ -23,4 +21,3 @@ class Model(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def write(self):
         pass
-
