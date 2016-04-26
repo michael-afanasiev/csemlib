@@ -139,7 +139,7 @@ class Ses3d(Model):
             h_points = np.c_[query_points, np.ones(query_points.shape[0])]
 
             # Initialize array to hold unfound points.
-            not_found = np.array(())
+            not_found = np.array((), dtype=int)
 
             # Initialize dataframe.
             elem_array = np.array(mesh.elements)
@@ -151,9 +151,10 @@ class Ses3d(Model):
                     vtx_to_element[j].append(i)
 
             # Pre make some index arrays.
-            h = np.ones(4)
+            t = np.empty((4, 4))
             idx = np.arange(4)
             par = self._data[param].values.ravel()
+            t[3, :] = np.ones(4)
 
             # Loop through all elements found on this pass.
             for i, [target, vtx] in enumerate(zip(h_points, f_points)):
@@ -167,10 +168,9 @@ class Ses3d(Model):
                 for elem in candidates:
 
                     # Setup (homogeneous) representation of candidate vertex.
-                    x = cols[elem[idx]]
-                    y = lons[elem[idx]]
-                    z = rads[elem[idx]]
-                    t = np.array([x, y, z, h])
+                    t[0, :] = cols[elem[idx]]
+                    t[1, :] = lons[elem[idx]]
+                    t[2, :] = rads[elem[idx]]
 
                     # Find barycentric coordinates and test for containment.
                     bary = np.linalg.solve(t, target.T)
