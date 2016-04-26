@@ -1,9 +1,13 @@
+import os
+
 import numpy as np
 
 import csemlib.background.skeleton as skl
 import csemlib.models.crust as crust
 import csemlib.models.one_dimensional as m1d
+import csemlib.models.ses3d as s3d
 
+TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 
 def test_fibonacci_sphere():
     true_y = np.array([-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9])
@@ -75,3 +79,24 @@ def test_crust():
 
     np.testing.assert_allclose(vals_dep, proper_dep)
     np.testing.assert_allclose(vals_vs, proper_vs)
+
+
+def test_ses3d():
+    """
+    Test to ensure that a ses3d model returns itself.
+    """
+
+    mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
+                    components=['drho', 'dvsv', 'dvsh', 'dvp'])
+    mod.read()
+
+    all_cols, all_lons, all_rads = np.meshgrid(
+        mod.data.coords['col'].values,
+        mod.data.coords['lon'].values,
+        mod.data.coords['rad'].values)
+    interp = mod.eval(all_cols.ravel(), all_lons.ravel(), all_rads.ravel(),
+                      param='dvsv')
+    true = mod.data['dvsv'].values.ravel()
+    diff = true - interp
+    for i, d in enumerate(diff):
+        assert (abs(d) < 1e-2)
