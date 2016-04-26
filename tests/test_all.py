@@ -97,6 +97,4 @@ def test_ses3d():
     interp = mod.eval(all_cols.ravel(), all_lons.ravel(), all_rads.ravel(),
                       param='dvsv')
     true = mod.data['dvsv'].values.ravel()
-    diff = true - interp
-    for i, d in enumerate(diff):
-        assert (abs(d) < 1e-2)
+    np.testing.assert_allclose(interp, true, atol=1e-2)
