@@ -3,6 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.basemap import Basemap
+import pytest
 
 import csemlib.background.skeleton as skl
 import csemlib.models.crust as crust
@@ -60,6 +61,11 @@ def test_prem_no220():
     np.testing.assert_allclose(m1d.prem_no220(1221.5, region='outer_core'), reg13)
     np.testing.assert_allclose(m1d.prem_no220(1221.5, region='inner_core'), reg14)
 
+    # Make sure that questionable requests will error out.
+    with pytest.raises(ValueError):
+        m1d.prem_no220(6371, 'uppermantle')
+    with pytest.raises(ValueError):
+        m1d.prem_no220(5971, 'lower_mantle')
 
 def test_crust():
     """
