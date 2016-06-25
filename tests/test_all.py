@@ -1,8 +1,6 @@
 import os
 
-import matplotlib.pyplot as plt
 import numpy as np
-from mpl_toolkits.basemap import Basemap
 import pytest
 
 import csemlib.background.skeleton as skl
@@ -135,9 +133,3 @@ def test_s20rts():
                     [6371],
                     'test').reshape((180, 180))
 
-    m = Basemap(projection='robin', lon_0=180, resolution='c')
-    x, y = m(np.degrees(l), 90 - np.degrees(c))
-    m.drawcoastlines()
-    m.pcolor(x, y, test, vmin=-0.04, vmax=0.04, cmap='RdBu')
-    m.colorbar()
-    plt.show()

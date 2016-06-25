@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 import xarray
-from meshpy.tet import build, Options
+from meshpy.tet import build, Options, MeshInfo
 from scipy.spatial import cKDTree
 
 from .model import Model
@@ -118,7 +118,7 @@ class Ses3d(Model):
         # Do the triangulation with MeshPy.
         # I tried using packages included with SciPy, but they all seemed
         # too slow.
-        mesh_info = ()
+        mesh_info = MeshInfo()
         mesh_info.set_points(pts)
         opts = Options("Q")
         mesh = build(mesh_info, options=opts)
