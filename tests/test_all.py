@@ -1,9 +1,14 @@
+import os
+
 import numpy as np
 import pytest
 
 import csemlib.background.skeleton as skl
+import csemlib.models.crust as crust
 import csemlib.models.one_dimensional as m1d
+import csemlib.models.ses3d as s3d
 
+TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 
 def test_fibonacci_sphere():
     true_y = np.array([-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9])
@@ -18,8 +23,10 @@ def test_fibonacci_sphere():
     np.testing.assert_allclose(points[2], true_z)
 
 def test_prem_no220():
-
-    # Good solutions for each region (including double for those at discontinuities.
+    """
+    Test to (mainly) make sure that discontinuities are handled properly.
+    :return:
+    """
     reg01 = np.array([3.374814283471982, 8.076866567257888, 4.4708837074242656, 4.570983707424266])
     reg02 = np.array([3.363837607910846, 8.014433950714174, 4.433659080207189, 4.422659080207189])
     reg03 = np.array([3.495466943964841, 8.751316606498193, 4.7139374352534915, 4.7139374352534915])
@@ -55,3 +62,44 @@ def test_prem_no220():
         m1d.prem_no220(6371, 'uppermantle')
     with pytest.raises(ValueError):
         m1d.prem_no220(5971, 'lower_mantle')
+
+def test_crust():
+    """
+    Test to ensure that the crust returns correct values.
+    """
+
+    proper_dep = np.array([[38.69471863, 17.96798953],
+                           [38.69471863, 17.96798953]])
+    proper_vs = np.array([[3.64649739, 3.1255109],
+                          [3.64649739, 3.1255109]])
+
+    cst = crust.Crust()
+    cst.read()
+
+    x = np.radians([179, 1])
+    y = np.radians([1, 1])
+    lats, lons = np.meshgrid(x, y)
+    vals_dep = cst.eval(lats, lons, param='crust_dep')
+    vals_vs = cst.eval(lats, lons, param='crust_vs')
+
+    np.testing.assert_allclose(vals_dep, proper_dep)
+    np.testing.assert_allclose(vals_vs, proper_vs)
+
+
+def test_ses3d():
+    """
+    Test to ensure that a ses3d model returns itself.
+    """
+
+    mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
+                    components=['drho', 'dvsv', 'dvsh', 'dvp'])
+    mod.read()
+
+    all_cols, all_lons, all_rads = np.meshgrid(
+        mod.data.coords['col'].values,
+        mod.data.coords['lon'].values,
+        mod.data.coords['rad'].values)
+    interp = mod.eval(all_cols.ravel(), all_lons.ravel(), all_rads.ravel(),
+                      param='dvsv')
+    true = mod.data['dvsv'].values.ravel()
+    np.testing.assert_allclose(interp, true, atol=1e-2)
