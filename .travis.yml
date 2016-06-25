@@ -31,7 +31,8 @@ install:
   # Dependencies
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest
   - source activate test-environment
-  - pip install pytest-cov codecov
+  - conda install geos proj4
+  - pip install pytest-cov codecov cartopy
   - pip install -e .
 
 script:

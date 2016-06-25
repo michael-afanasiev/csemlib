@@ -1,10 +1,13 @@
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.basemap import Basemap
 
 import csemlib.background.skeleton as skl
 import csemlib.models.crust as crust
 import csemlib.models.one_dimensional as m1d
+import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
@@ -98,3 +101,37 @@ def test_ses3d():
                       param='dvsv')
     true = mod.data['dvsv'].values.ravel()
     np.testing.assert_allclose(interp, true, atol=1e-2)
+
+
+def test_s20rts():
+    """
+    Test to ensure that s20 rts calls returns some proper values.
+    :return:
+    """
+
+    coords = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'))
+    coords.read()
+
+    mod = s20.S20rts()
+    mod.read()
+
+    # c, l, r = np.meshgrid(
+    #     coords.data.coords['col'].values,
+    #     coords.data.coords['lon'].values,
+    #     coords.data.coords['rad'].values[0])
+
+    c, l = np.meshgrid(
+        np.linspace(0, np.pi, 180),
+        np.linspace(0, 2 * np.pi, 180))
+
+    test = mod.eval(c.ravel(),
+                    l.ravel(),
+                    [6371],
+                    'test').reshape((180, 180))
+
+    m = Basemap(projection='robin', lon_0=180, resolution='c')
+    x, y = m(np.degrees(l), 90 - np.degrees(c))
+    m.drawcoastlines()
+    m.pcolor(x, y, test, vmin=-0.04, vmax=0.04, cmap='RdBu')
+    m.colorbar()
+    plt.show()
