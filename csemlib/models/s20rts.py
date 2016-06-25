@@ -46,7 +46,6 @@ class S20rts(Model):
             for m in range(2 * n + 1):
                 if m == 0 or (m % 2):
                     val += self.l0[n][m] * np.real(sph_harm(real, n, y, x))
-                    # print(self.l0[n][m], real)
                     real += 1
                 else:
                     val += self.l0[n][m] * np.imag(sph_harm(imag, n, y, x))

@@ -4,10 +4,8 @@ import os
 
 import numpy as np
 import xarray
-from meshpy.tet import build, Options, MeshInfo
-from scipy.spatial import cKDTree
 
-from .model import Model
+from .model import Model, shade, triangulate, interpolate
 
 
 class Ses3d(Model):
@@ -109,90 +107,14 @@ class Ses3d(Model):
         lons = lons.ravel()
         rads = rads.ravel()
 
-        # Set up the simplex vertices.
-        pts = np.array((cols, lons, rads)).T
+        # Generate tetrahedra.
+        elements = triangulate(cols, lons, rads)
 
-        # Set up the KdTree.
-        tree = cKDTree(pts)
+        # Get interpolating functions.
+        indices, barycentric_coordinates = shade(x, y, z, cols, lons, rads, elements)
+        interp_param = []
+        for i, p in enumerate(param):
+            interp_param.append(np.array(
+                interpolate(indices, barycentric_coordinates, self.data[p].values.ravel()), dtype=np.float64))
 
-        # Do the triangulation with MeshPy.
-        # I tried using packages included with SciPy, but they all seemed
-        # too slow.
-        mesh_info = MeshInfo()
-        mesh_info.set_points(pts)
-        opts = Options("Q")
-        mesh = build(mesh_info, options=opts)
-
-        # Set the initial points to be found.
-        query_points = np.array((x, y, z)).T
-
-        # Assume we won't find everything on the first pass
-        radius = 1
-        all_found = False
-        interp_values = np.empty(query_points.shape[0])
-        while not all_found:
-
-            # Get closest 'radius' points
-            _, f_points = tree.query(query_points, k=radius)
-
-            # Get homogeneous representation of found points.
-            h_points = np.c_[query_points, np.ones(query_points.shape[0])]
-
-            # Initialize array to hold unfound points.
-            not_found = np.array((), dtype=int)
-
-            # Initialize dataframe.
-            elem_array = np.array(mesh.elements)
-
-            # Generate the vertex -> element mapping.
-            vtx_to_element = [[] for _ in range(elem_array.shape[0])]
-            for i in elem_array:
-                for j in i:
-                    vtx_to_element[j].append(i)
-
-            # Pre make some index arrays.
-            t = np.empty((4, 4))
-            idx = np.arange(4)
-            par = self._data[param].values.ravel()
-            t[3, :] = np.ones(4)
-
-            # Loop through all elements found on this pass.
-            for i, [target, vtx] in enumerate(zip(h_points, f_points)):
-
-                # Assume we're not going to find the point
-                found = False
-
-                # Find all elements to which this vertex belongs.
-                candidates = vtx_to_element[vtx]
-
-                for elem in candidates:
-
-                    # Setup (homogeneous) representation of candidate vertex.
-                    t[0, :] = cols[elem[idx]]
-                    t[1, :] = lons[elem[idx]]
-                    t[2, :] = rads[elem[idx]]
-
-                    # Find barycentric coordinates and test for containment.
-                    bary = np.linalg.solve(t, target.T)
-                    if np.all(np.logical_and(bary >= 0, bary <= 1)):
-                        vtx_vals = par[elem[idx]]
-
-                        # Interpolate value if found.
-                        interp_values[i] = np.dot(bary, vtx_vals)
-
-                        # If we find the point, no more work needs to be done
-                        found = True
-                        break
-
-                # Save those points which we do not find.
-                if not found:
-                    not_found = np.append(not_found, [i])
-
-            # Recreate missed query points or quit.
-            if not_found.size:
-                query_points = np.atleast_2d(
-                    np.array((x[not_found], y[not_found], z[not_found])).T)
-            else:
-                all_found = True
-
-        return interp_values
+        return np.array(interp_param).T

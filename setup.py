@@ -1,7 +1,9 @@
+from Cython.Build import cythonize
 from setuptools import setup, find_packages
 
 setup(
     name='csemlib',
+    ext_modules=cythonize('./csemlib/models/model.pyx'),
     version='0.1',
     packages=find_packages(),
     include_package_data=True,
