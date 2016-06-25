@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import csemlib.background.skeleton as skl
 import csemlib.models.one_dimensional as m1d
@@ -16,8 +17,9 @@ def test_fibonacci_sphere():
     np.testing.assert_allclose(points[1], true_y)
     np.testing.assert_allclose(points[2], true_z)
 
-
 def test_prem_no220():
+
+    # Good solutions for each region (including double for those at discontinuities.
     reg01 = np.array([3.374814283471982, 8.076866567257888, 4.4708837074242656, 4.570983707424266])
     reg02 = np.array([3.363837607910846, 8.014433950714174, 4.433659080207189, 4.422659080207189])
     reg03 = np.array([3.495466943964841, 8.751316606498193, 4.7139374352534915, 4.7139374352534915])
@@ -47,3 +49,9 @@ def test_prem_no220():
     np.testing.assert_allclose(m1d.prem_no220(3480, region='outer_core'), reg12)
     np.testing.assert_allclose(m1d.prem_no220(1221.5, region='outer_core'), reg13)
     np.testing.assert_allclose(m1d.prem_no220(1221.5, region='inner_core'), reg14)
+
+    # Make sure that questionable requests will error out.
+    with pytest.raises(ValueError):
+        m1d.prem_no220(6371, 'uppermantle')
+    with pytest.raises(ValueError):
+        m1d.prem_no220(5971, 'lower_mantle')
