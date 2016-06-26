@@ -13,6 +13,7 @@ import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
+DECIMAL_CLOSE = 3
 
 
 def test_fibonacci_sphere():
@@ -23,9 +24,9 @@ def test_fibonacci_sphere():
                        -0.53403767, 0.92123347, -0.76855288, 0.24497858, 0.16631658])
 
     points = skl.fibonacci_sphere(10)
-    np.testing.assert_allclose(points[0], true_x)
-    np.testing.assert_allclose(points[1], true_y)
-    np.testing.assert_allclose(points[2], true_z)
+    np.testing.assert_almost_equal(points[0], true_x, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(points[1], true_y, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(points[2], true_z, decimal=DECIMAL_CLOSE)
 
 
 def test_prem_no220():
@@ -48,20 +49,20 @@ def test_prem_no220():
     reg13 = np.array([12.166331854652926, 10.35571579802768, 0.0, 0.0])
     reg14 = np.array([12.763614264456663, 11.02826139091006, 3.5043113193074316, 3.5043113193074316])
 
-    np.testing.assert_allclose(m1d.prem_no220(6292, region='upper_mantle'), reg01)
-    np.testing.assert_allclose(m1d.prem_no220(6191, region='upper_mantle'), reg02)
-    np.testing.assert_allclose(m1d.prem_no220(6051, region='upper_mantle'), reg03)
-    np.testing.assert_allclose(m1d.prem_no220(5971, region='upper_mantle'), reg04)
-    np.testing.assert_allclose(m1d.prem_no220(5971, region='transition_zone'), reg05)
-    np.testing.assert_allclose(m1d.prem_no220(5771, region='transition_zone'), reg06)
-    np.testing.assert_allclose(m1d.prem_no220(5701, region='transition_zone'), reg07)
-    np.testing.assert_allclose(m1d.prem_no220(5701, region='lower_mantle'), reg08)
-    np.testing.assert_allclose(m1d.prem_no220(5600, region='lower_mantle'), reg09)
-    np.testing.assert_allclose(m1d.prem_no220(3630, region='lower_mantle'), reg10)
-    np.testing.assert_allclose(m1d.prem_no220(3480, region='lower_mantle'), reg11)
-    np.testing.assert_allclose(m1d.prem_no220(3480, region='outer_core'), reg12)
-    np.testing.assert_allclose(m1d.prem_no220(1221.5, region='outer_core'), reg13)
-    np.testing.assert_allclose(m1d.prem_no220(1221.5, region='inner_core'), reg14)
+    np.testing.assert_almost_equal(m1d.prem_no220(6292, region='upper_mantle'), reg01, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(6191, region='upper_mantle'), reg02, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(6051, region='upper_mantle'), reg03, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(5971, region='upper_mantle'), reg04, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(5971, region='transition_zone'), reg05, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(5771, region='transition_zone'), reg06, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(5701, region='transition_zone'), reg07, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(5701, region='lower_mantle'), reg08, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(5600, region='lower_mantle'), reg09, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(3630, region='lower_mantle'), reg10, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(3480, region='lower_mantle'), reg11, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(3480, region='outer_core'), reg12, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(1221.5, region='outer_core'), reg13, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(m1d.prem_no220(1221.5, region='inner_core'), reg14, decimal=DECIMAL_CLOSE)
 
     # Make sure that questionable requests will error out.
     with pytest.raises(ValueError):
@@ -89,8 +90,8 @@ def test_crust():
     vals_dep = cst.eval(lats, lons, param='crust_dep')
     vals_vs = cst.eval(lats, lons, param='crust_vs')
 
-    np.testing.assert_allclose(vals_dep, proper_dep)
-    np.testing.assert_allclose(vals_vs, proper_vs)
+    np.testing.assert_almost_equal(vals_dep, proper_dep, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(vals_vs, proper_vs, decimal=DECIMAL_CLOSE)
 
 
 def test_gourard_shading():
@@ -104,7 +105,7 @@ def test_gourard_shading():
     idx = np.array([[0, 1, 2, 3]]).T
 
     np.testing.assert_almost_equal(
-        csemlib.models.model.interpolate(idx, bry, data), true_val)
+        csemlib.models.model.interpolate(idx, bry, data), true_val, decimal=DECIMAL_CLOSE)
 
 
 def test_barycenter_detection():
@@ -140,8 +141,8 @@ def test_barycenter_detection():
     ind, bary = csemlib.models.model.shade(x_target, y_target, z_target,
                                            x_mesh, y_mesh, z_mesh,
                                            elements)
-    np.testing.assert_allclose(ind, true_ind)
-    np.testing.assert_allclose(bary, true_bar)
+    np.testing.assert_almost_equal(ind, true_ind, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(bary, true_bar, decimal=DECIMAL_CLOSE)
 
 
 def test_ses3d():
@@ -167,9 +168,7 @@ def test_ses3d():
     true[:, 2] = mod.data['dvsh'].values.ravel()
     true[:, 3] = mod.data['dvp'].values.ravel()
 
-    # TODO: Figure out why normal assert_almost_equal does not work.
-    diff = true - interp
-    assert (np.amax(1e-1 > np.absolute(diff)))
+    np.testing.assert_almost_equal(true, interp, decimal=DECIMAL_CLOSE)
 
 
 def test_s20rts():
@@ -210,4 +209,4 @@ def test_s20rts():
 
     vals = mod.eval(cols, lons, 6371, 'test').reshape(size, size).T
     dat = xarray.DataArray(vals, dims=['lat', 'lon'], coords=[90 - np.degrees(col), np.degrees(lon)])
-    np.testing.assert_allclose(dat.values, true)
+    np.testing.assert_almost_equal(dat.values, true, decimal=DECIMAL_CLOSE)

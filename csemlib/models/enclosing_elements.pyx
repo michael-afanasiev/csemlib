@@ -14,35 +14,50 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
                        np.ndarray[DTYPE_FLOAT, ndim=1] x_mesh,
                        np.ndarray[DTYPE_FLOAT, ndim=1] y_mesh,
                        np.ndarray[DTYPE_FLOAT, ndim=1] z_mesh):
+    """Optimized algorithm to locate the smallest enclosing tetrahedra around a given point.
 
-    # First, invert graph structure.
-    cdef np.ndarray[DTYPE_FLOAT, ndim=1] l = np.empty(4, dtype=np.float)
+    Assuming that the closest vertices have already been found (say, by a kD-Tree), this function
+    will loop over elements belonging to the closest vertices, and both the elements, and
+    multiplicative factors (barycentric coordinates) will be returned.
+
+    Below, K refers to the number of queried points, N to number of interpolating elements,
+    M to the number of vertices of a tetrahedron (4), and J to the number of interpolating nodes.
+    :param closest_vertices: A K-dimensional vector containing the closest vertices to a queried point.
+    :param connectivity: An NxM matrix containing element connectivity.
+    :param homogeneous_crds: A KxM matrix containing the queried point.
+    :param x_mesh: A J-dimensional vector of tetrahedral x coordinates.
+    :param y_mesh: A J-dimensional vector of tetrahedral y coordinates.
+    :param z_mesh: A J-dimensional vector of tetrahedral z coordinates.
+    :return: (JxM matrix of enclosing connectivities, JxM matrix of corresponding barycentric coordinates).
+    """
+
+    ##### CYTHON VARIABLE DECLARATIONS #####
     cdef int vtx_per_elm = 4
-    cdef int i, j, k, max_connect, trial_elem
-    max_connect = np.amax(np.bincount(connectivity.flatten()))
-    cdef np.ndarray[DTYPE_INT, ndim=2] closure = np.full((max_connect, len(x_mesh)), fill_value=-1.0,
-                                                         dtype=np.int)
-    cdef np.ndarray[DTYPE_INT, ndim=1] bookkeep = np.zeros(len(x_mesh), dtype=np.int)
+    cdef int i, j, k, trial_elem
     cdef int ni = connectivity.shape[0]
     cdef int nj = connectivity.shape[1]
-    cdef int nni = len(bookkeep)
-    for i in range(ni):
-        for j in range(nj):
-            closure[bookkeep[connectivity[i,j]],connectivity[i,j]] = i
-            bookkeep[connectivity[i,j]] += 1
-
-    # Now, initialize some values.
-    cdef np.ndarray[DTYPE_INT, ndim=1] c = np.empty(4, dtype=np.int)
-    cdef np.ndarray[DTYPE_FLOAT, ndim=2] t = np.ones((4, 4))
-    cdef np.ndarray[DTYPE_FLOAT, ndim=1] barycentric = np.empty(4, np.float)
-    cdef num_target_points = homogeneous_crds.shape[0]
-    cdef np.ndarray[DTYPE_INT, ndim=2] found_elms = np.empty((4, num_target_points), dtype=np.int)
-    cdef np.ndarray[DTYPE_FLOAT, ndim=2] found_bary = np.empty((4, num_target_points), dtype=np.float)
+    cdef int num_target_points = homogeneous_crds.shape[0]
+    cdef int max_connect = np.amax(np.bincount(connectivity.flatten()))
 
     cdef float vecx, vecy, vecz
     cdef float ab, bb, cb, db, eb, fb, gb, hb, ib
     cdef float ai, bi, ci, di, ei, fi, gi, hi, ii, det
 
+    cdef np.ndarray[DTYPE_FLOAT, ndim=1] l = np.empty(4, dtype=np.float)
+    cdef np.ndarray[DTYPE_INT, ndim=1] bookkeep = np.zeros(len(x_mesh), dtype=np.int)
+    cdef np.ndarray[DTYPE_FLOAT, ndim=2] t = np.ones((vtx_per_elm, vtx_per_elm))
+    cdef np.ndarray[DTYPE_FLOAT, ndim=1] barycentric = np.empty(vtx_per_elm, np.float)
+    cdef np.ndarray[DTYPE_INT, ndim=2] found_elms = np.empty((vtx_per_elm, num_target_points), dtype=np.int)
+    cdef np.ndarray[DTYPE_FLOAT, ndim=2] found_bary = np.empty((vtx_per_elm, num_target_points), dtype=np.float)
+    cdef np.ndarray[DTYPE_INT, ndim=2] closure = np.full((max_connect, len(x_mesh)), fill_value=-1.0, dtype=np.int)
+    ##### END VARIABLES DECLARATIONS #####
+
+    # First, invert graph structure.
+    max_connect = np.amax(np.bincount(connectivity.flatten()))
+    for i in range(ni):
+        for j in range(nj):
+            closure[bookkeep[connectivity[i,j]],connectivity[i,j]] = i
+            bookkeep[connectivity[i,j]] += 1
 
     # Outer loop over all targets.
     for i in range(num_target_points):
@@ -61,11 +76,12 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
                 t[1, k] = y_mesh[connectivity[trial_elem, k]]
                 t[2, k] = z_mesh[connectivity[trial_elem, k]]
 
-            # Get barycentric coordinates for this trial element.
+            # Get offset vector.
             vecx = homogeneous_crds[i, 0] - t[0, 3]
             vecy = homogeneous_crds[i, 1] - t[1, 3]
             vecz = homogeneous_crds[i, 2] - t[2, 3]
 
+            # Get barycentric matrix components.
             ab = t[0, 0] - t[0, 3]
             db = t[1, 0] - t[1, 3]
             gb = t[2, 0] - t[2, 3]
@@ -76,9 +92,11 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
             fb = t[1, 2] - t[1, 3]
             ib = t[2, 2] - t[2, 3]
 
+            # Calculate barycentric matrix determinant.
             det = 1.0 / (( ab * ( eb * ib - fb * hb ) ) - ( bb * ( ib * db - fb * gb ) ) +
                        ( cb * ( db * hb - eb * gb ) ))
 
+            # Invert barycentric matrix.
             ai = det * (eb * ib - fb * hb)
             bi = det * (db * ib - fb * gb) * (-1)
             ci = det * (db * hb - eb * gb)
@@ -89,24 +107,17 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
             hi = det * (ab * fb - cb * db) * (-1)
             ii = det * (ab * eb - bb * db)
 
+            # Get barycentric coordinates for this element.
             l[0] = ai * vecx + di * vecy + gi * vecz
             l[1] = bi * vecx + ei * vecy + hi * vecz
             l[2] = ci * vecx + fi * vecy + ii * vecz
             l[3] = 1 - l[0] - l[1] - l[2]
 
+            # Test if point is inside. If so, save factors and continue.
             if l[0] >= 0 and l[1] >= 0 and l[2] >= 0 and l[3] >= 0:
                 for k in range(vtx_per_elm):
                     found_elms[k, i] = connectivity[trial_elem, k]
                     found_bary[k, i] = l[k]
                 break
 
-
-
     return found_elms, found_bary
-
-
-
-
-
-
-
