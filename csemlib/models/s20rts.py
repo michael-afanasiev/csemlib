@@ -16,7 +16,7 @@ class S20rts(Model):
         pass
 
     def __init__(self):
-        super().__init__()
+        super(S20rts, self).__init__()
         directory, _ = os.path.split(os.path.split(__file__)[0])
         self.directory = os.path.join(directory, 'data', 's20rts')
 
