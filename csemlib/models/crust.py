@@ -15,7 +15,7 @@ class Crust(Model):
 
     def __init__(self):
 
-        super().__init__()
+        super(Crust, self).__init__()
         self._data = xarray.Dataset()
 
         directory = os.path.split(os.path.split(__file__)[0])[0]
