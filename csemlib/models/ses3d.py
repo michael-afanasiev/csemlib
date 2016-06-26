@@ -6,6 +6,21 @@ import numpy as np
 import xarray
 
 from .model import Model, shade, triangulate, interpolate
+from collections import namedtuple
+
+region = namedtuple('region', 'num val')
+
+
+def _read_multi_region_file(data):
+    regions = []
+    num_region, region_start = None, None
+    num_regions = int(data[0])
+    for i in range(num_regions):
+        region_start = region_start + num_region + 1 if region_start else 2
+        num_region = data[region_start-1] if num_region else data[1]
+        regions.append(data[region_start:region_start + num_region])
+
+    return regions
 
 
 class Ses3d(Model):
@@ -16,7 +31,7 @@ class Ses3d(Model):
     def __init__(self, name, directory,
                  components=[], doi=None):
         super(Ses3d, self).__init__()
-        self._data = xarray.Dataset()
+        self._data = []
         self.directory = directory
         self.components = components
         if doi:
@@ -25,8 +40,8 @@ class Ses3d(Model):
             self.doi = 'None'
 
     @property
-    def data(self):
-        return self._data
+    def data(self, region=0):
+        return self._data[region]
 
     def read(self):
 
@@ -39,48 +54,60 @@ class Ses3d(Model):
 
         # Read values.
         with io.open(os.path.join(self.directory, 'block_x'), 'rt') as fh:
-            col = np.asarray(fh.readlines()[2:], dtype=float)
+            data = np.asarray(fh.readlines(), dtype=float)
+            col_regions = _read_multi_region_file(data)
         with io.open(os.path.join(self.directory, 'block_y'), 'rt') as fh:
-            lon = np.asarray(fh.readlines()[2:], dtype=float)
+            data = np.asarray(fh.readlines(), dtype=float)
+            lon_regions = _read_multi_region_file(data)
         with io.open(os.path.join(self.directory, 'block_z'), 'rt') as fh:
-            rad = np.asarray(fh.readlines()[2:], dtype=float)
+            data = np.asanyarray(fh.readlines(), dtype=float)
+            rad_regions = _read_multi_region_file(data)
 
         # Get centers of boxes.
-        col = 0.5 * (col[1:] + col[:-1])
-        lon = 0.5 * (lon[1:] + lon[:-1])
-        rad = 0.5 * (rad[1:] + rad[:-1])
+        for i, _ in enumerate(col_regions):
+            col_regions[i] = 0.5 * (col_regions[i][1:] + col_regions[i][:-1])
+            lon_regions[i] = 0.5 * (lon_regions[i][1:] + lon_regions[i][:-1])
+            rad_regions[i] = 0.5 * (rad_regions[i][1:] + rad_regions[i][:-1])
 
         # Read in parameters.
         for p in self.components:
             with io.open(os.path.join(self.directory, p), 'rt') as fh:
-                val = np.asarray(fh.readlines()[2:], dtype=float)
-            val = val.reshape(col.size, lon.size, rad.size)
-            self._data[p] = (('col', 'lon', 'rad'), val)
-            if 'rho' in p:
-                self._data[p].attrs['units'] = 'g/cm3'
-            else:
-                self._data[p].attrs['units'] = 'km/s'
+                data = np.asarray(fh.readlines(), dtype=float)
+                val_regions = _read_multi_region_file(data)
+
+            for i, _ in enumerate(val_regions):
+                val_regions[i] = val_regions[i].reshape((len(col_regions[i]), len(lon_regions[i]),
+                                                         len(rad_regions[i])))
+                if not self._data:
+                    self._data = [xarray.Dataset() for i in range(len(val_regions))]
+
+                self._data[i][p] = (('col', 'lon', 'rad'), val_regions[i])
+                if 'rho' in p:
+                    self._data[i][p].attrs['units'] = 'g/cm3'
+                else:
+                    self._data[i][p].attrs['units'] = 'km/s'
 
         # Add coordinates.
-        self._data.coords['col'] = np.radians(col)
-        self._data.coords['lon'] = np.radians(lon)
-        self._data.coords['rad'] = rad
+        for i, _ in enumerate(val_regions):
+            self._data[i].coords['col'] = np.radians(col_regions[i])
+            self._data[i].coords['lon'] = np.radians(lon_regions[i])
+            self._data[i].coords['rad'] = rad_regions[i]
 
-        # Add units.
-        self._data.coords['col'].attrs['units'] = 'radians'
-        self._data.coords['lon'].attrs['units'] = 'radians'
-        self._data.coords['rad'].attrs['units'] = 'km'
+            # Add units.
+            self._data[i].coords['col'].attrs['units'] = 'radians'
+            self._data[i].coords['lon'].attrs['units'] = 'radians'
+            self._data[i].coords['rad'].attrs['units'] = 'km'
 
-        # Add Ses3d attributes.
-        self._data.attrs['solver'] = 'ses3d'
-        self._data.attrs['coordinate_system'] = 'spherical'
-        self._data.attrs['date'] = datetime.datetime.now().__str__()
-        self._data.attrs['doi'] = self.doi
+            # Add Ses3d attributes.
+            self._data[i].attrs['solver'] = 'ses3d'
+            self._data[i].attrs['coordinate_system'] = 'spherical'
+            self._data[i].attrs['date'] = datetime.datetime.now().__str__()
+            self._data[i].attrs['doi'] = self.doi
 
     def write(self):
         print('Writing')
 
-    def eval(self, x, y, z, param=None):
+    def eval(self, x, y, z, param=None, region=0):
         """
         Return the interpolated parameter at a spatial location.
 
@@ -100,9 +127,9 @@ class Ses3d(Model):
 
         # Pack up the points.
         cols, lons, rads = np.meshgrid(
-            self._data.coords['col'].values,
-            self._data.coords['lon'].values,
-            self._data.coords['rad'].values)
+            self._data[region].coords['col'].values,
+            self._data[region].coords['lon'].values,
+            self._data[region].coords['rad'].values)
         cols = cols.ravel()
         lons = lons.ravel()
         rads = rads.ravel()
@@ -111,8 +138,8 @@ class Ses3d(Model):
         elements = triangulate(cols, lons, rads)
 
         # Get interpolating functions.
-        indices, barycentric_coordinates = shade(x, y, z, cols, lons, rads, elements)
         interp_param = []
+        indices, barycentric_coordinates = shade(x, y, z, cols, lons, rads, elements)
         for i, p in enumerate(param):
             interp_param.append(np.array(
                 interpolate(indices, barycentric_coordinates, self.data[p].values.ravel()), dtype=np.float64))

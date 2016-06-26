@@ -31,6 +31,8 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
     :return: (JxM matrix of enclosing connectivities, JxM matrix of corresponding barycentric coordinates).
     """
 
+    print("COMPUTING GRAPH CLOSURE")
+
     ##### CYTHON VARIABLE DECLARATIONS #####
     cdef int vtx_per_elm = 4
     cdef int i, j, k, trial_elem
@@ -39,6 +41,7 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
     cdef int num_target_points = homogeneous_crds.shape[0]
     cdef int max_connect = np.amax(np.bincount(connectivity.flatten()))
 
+    cdef float eps = -1e-6
     cdef float vecx, vecy, vecz
     cdef float ab, bb, cb, db, eb, fb, gb, hb, ib
     cdef float ai, bi, ci, di, ei, fi, gi, hi, ii, det
@@ -114,7 +117,7 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
             l[3] = 1 - l[0] - l[1] - l[2]
 
             # Test if point is inside. If so, save factors and continue.
-            if l[0] >= 0 and l[1] >= 0 and l[2] >= 0 and l[3] >= 0:
+            if l[0] >= eps and l[1] >= eps and l[2] >= eps and l[3] >= eps:
                 for k in range(vtx_per_elm):
                     found_elms[k, i] = connectivity[trial_elem, k]
                     found_bary[k, i] = l[k]

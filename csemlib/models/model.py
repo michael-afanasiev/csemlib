@@ -45,6 +45,7 @@ def interpolate(idx, bry, dat):
     :param dat: A 1-D array of data, specified on all vertices. These values will be interpolated.
     :returns: An array of length j, containing interpolated values.
     """
+
     nx, ny = idx.shape
     result = np.zeros(ny)
     for i in range(ny):
@@ -65,6 +66,7 @@ def triangulate(x, y, z):
     :returns: A list-of-lists containing connectivity of the resulting mesh.
     """
 
+    print("COMPUTING DELAUNY TRIANGULATION")
     # Set up the simplex vertices.
     pts = np.array((x, y, z)).T
 
@@ -91,8 +93,11 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
     :param z_mesh: (Cartesian) z values defining the tetrahedra.
     :param elements: List of lists defining the connectivity of tetrahedra.
     """
+
+    print("COMPUTING GOURARD SHADING")
     # Generate KDTree of element vertices.
-    tree = cKDTree(np.array((x_mesh, y_mesh, z_mesh)).T)
+    tree = cKDTree(np.array((x_mesh, y_mesh, z_mesh)).T, balanced_tree=False)
+    print("TREE DONE")
 
     # Set the initial points to be found.
     query_points = np.array((x_target, y_target, z_target)).T
@@ -102,7 +107,9 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
     while not all_found:
 
         # Get closest 'radius' points
-        _, f_points = tree.query(query_points, k=radius)
+        print("FINDING TREE")
+        _, f_points = tree.query(query_points, k=radius, n_jobs=-1)
+        print("TREE FOUND")
 
         # Get homogeneous representation of found points.
         h_points = np.c_[query_points, np.ones(query_points.shape[0])]
@@ -112,12 +119,6 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
 
         # Initialize dataframe.
         elements = np.array(elements)
-
-        # Generate the vertex -> element mapping.
-        vtx_to_element = [[] for _ in range(x_mesh.shape[0])]
-        for i in elements:
-            for j in i:
-                vtx_to_element[j].append(i)
 
         ind, bary = enclosing_elements.enclosing_elements(f_points.astype(np.int),
                                                           elements.astype(np.int),
