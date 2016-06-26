@@ -27,7 +27,7 @@ install:
   - conda info -a
 
   # Dependencies
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest cython numba xarray pandas matplotlib cartopy
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest cython numba xarray pandas matplotlib
   - source activate test-environment
   - conda install geos proj4
   - pip install pytest-cov codecov cartopy
