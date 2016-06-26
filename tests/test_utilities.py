@@ -30,8 +30,3 @@ def test_cart2sph():
                                    np.array((1, np.math.pi / 2.0, np.math.pi / 2.0)))
     np.testing.assert_almost_equal(np.array(utl.cart2sph(0, 0, 1)),
                                    np.array((1, 0, 0)))
-
-
-def test_rad2deg():
-    np.testing.assert_almost_equal(utl.rad2deg(np.math.pi / 2.0), 90)
-    np.testing.assert_almost_equal(utl.deg2rad(180), np.math.pi)

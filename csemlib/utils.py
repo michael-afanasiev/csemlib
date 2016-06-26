@@ -1,24 +1,6 @@
 import numpy as np
 
 
-def deg2rad(deg):
-    """
-    Converts degrees to radians.
-    :param deg: Value in degrees.
-    :return: Values in radians.
-    """
-    return deg * np.math.pi / 180.0
-
-
-def rad2deg(rad):
-    """
-    Coverts radians to degrees.
-    :param rad: Value in radians.
-    :return: Value in degrees.
-    """
-    return rad * 180.0 / np.math.pi
-
-
 def sph2cart(col, lon, rad=1):
     """
     Given spherical coordinates as input, returns their cartesian equivalent.

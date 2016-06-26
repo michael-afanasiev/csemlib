@@ -1,9 +1,14 @@
 import abc
 
 import numpy as np
+import pyximport
+pyximport.install(setup_args={"include_dirs": np.get_include()})
+
+from . import enclosing_elements
 from meshpy.tet import build, Options, MeshInfo
 from numba import jit
 from scipy.spatial.ckdtree import cKDTree
+
 
 
 class Model:
@@ -86,7 +91,6 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
     :param z_mesh: (Cartesian) z values defining the tetrahedra.
     :param elements: List of lists defining the connectivity of tetrahedra.
     """
-
     # Generate KDTree of element vertices.
     tree = cKDTree(np.array((x_mesh, y_mesh, z_mesh)).T)
 
@@ -95,7 +99,6 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
 
     # Initialize search parameters.
     radius, all_found, interp_values = 1, False, np.empty(query_points.shape[0])
-    ind, bary = np.empty([4, query_points.shape[0]], dtype=np.int64), np.empty([4, query_points.shape[0]])
     while not all_found:
 
         # Get closest 'radius' points
@@ -116,47 +119,12 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
             for j in i:
                 vtx_to_element[j].append(i)
 
-        # Preallocate some arrays.
-        t = np.empty((4, 4))
-        idx = np.arange(4)
-        t[3, :] = np.ones(4)
-
-        # Loop through all elements found on this pass.
-        for i, [target, vtx] in enumerate(zip(h_points, f_points)):
-
-            # Assume we're not going to find the point
-            found = False
-
-            # Find all elements to which this vertex belongs.
-            candidates = vtx_to_element[vtx]
-
-            for elem in candidates:
-
-                # Setup (homogeneous) representation of candidate vertex.
-                t[0, :] = x_mesh[elem[idx]]
-                t[1, :] = y_mesh[elem[idx]]
-                t[2, :] = z_mesh[elem[idx]]
-
-                # Find barycentric coordinates and test for containment.
-                barycentric = np.linalg.solve(t, target.T)
-                if np.all(np.logical_and(barycentric >= 0, barycentric <= 1)):
-                    # Save the vertices, and barycentric coordaintes, of a successful find.
-                    ind[:, i] = elem[idx]
-                    bary[:, i] = barycentric
-
-                    # If we find the point, no more work needs to be done
-                    found = True
-                    break
-
-            # Save those points which we do not find.
-            if not found:
-                not_found = np.append(not_found, [i])
-
-        # Recreate missed query points or quit.
-        if not_found.size:
-            query_points = np.atleast_2d(
-                np.array((x_target[not_found], y_target[not_found], z_target[not_found])).T)
-        else:
-            all_found = True
+        ind, bary = enclosing_elements.enclosing_elements(f_points.astype(np.int),
+                                                          elements.astype(np.int),
+                                                          h_points.astype(np.float),
+                                                          x_mesh.astype(np.float),
+                                                          y_mesh.astype(np.float),
+                                                          z_mesh.astype(np.float))
+        break
 
     return ind, bary

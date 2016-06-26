@@ -1,6 +1,6 @@
 import os
-
 import numpy as np
+
 import pytest
 import xarray
 from meshpy.tet import MeshInfo, build, Options
@@ -112,18 +112,18 @@ def test_barycenter_detection():
     Simple test to ensure that the interpolation routine works.
     """
 
-    true_ind = np.array([[0, 0], [3, 7], [7, 6], [2, 2]])
-    true_bar = np.array([[1.00000000e+00, 5.00000000e-01],
-                         [0.00000000e+00, 1.85037171e-17],
-                         [0.00000000e+00, 8.33333333e-02],
-                         [0.00000000e+00, 4.16666667e-01]])
+    true_ind = np.array([[0, 0], [3, 3], [7, 7], [2, 2]], dtype=np.int64)
+    true_bar = np.array([[1.00000000e+00, 0.00000000e+00],
+                         [0.00000000e+00, 0.00000000e+00],
+                         [0.00000000e+00, 1.00000000e+00],
+                         [0.00000000e+00, 0.00000000e+00]])
 
     vertices = [
         (0, 0, 0), (2, 0, 0), (2, 2, 0), (0, 2, 0),
         (0, 0, 12), (2, 0, 12), (2, 2, 12), (0, 2, 12),
     ]
     x_mesh, y_mesh, z_mesh = np.array(vertices)[:, 0], np.array(vertices)[:, 1], np.array(vertices)[:, 2]
-    x_target, y_target, z_target = [0, 1], [0, 1], [0, 1]
+    x_target, y_target, z_target = np.array([0, 0]), np.array([0, 2]), np.array([0, 12])
     mesh_info = MeshInfo()
     mesh_info.set_points(list(vertices))
     mesh_info.set_facets([
@@ -136,9 +136,10 @@ def test_barycenter_detection():
     ])
     opts = Options("Q")
     mesh = build(mesh_info, options=opts)
+    elements = np.array(mesh.elements)
     ind, bary = csemlib.models.model.shade(x_target, y_target, z_target,
                                            x_mesh, y_mesh, z_mesh,
-                                           mesh.elements)
+                                           elements)
     np.testing.assert_allclose(ind, true_ind)
     np.testing.assert_allclose(bary, true_bar)
 
@@ -168,7 +169,7 @@ def test_ses3d():
 
     # TODO: Figure out why normal assert_almost_equal does not work.
     diff = true - interp
-    assert (np.amax(np.absolute(diff) < 1e-1))
+    assert (np.amax(1e-1 > np.absolute(diff)))
 
 
 def test_s20rts():
