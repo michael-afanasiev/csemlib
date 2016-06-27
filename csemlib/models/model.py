@@ -97,7 +97,6 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
     print("COMPUTING GOURARD SHADING")
     # Generate KDTree of element vertices.
     tree = cKDTree(np.array((x_mesh, y_mesh, z_mesh)).T, balanced_tree=False)
-    print("TREE DONE")
 
     # Set the initial points to be found.
     query_points = np.array((x_target, y_target, z_target)).T
@@ -107,9 +106,7 @@ def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
     while not all_found:
 
         # Get closest 'radius' points
-        print("FINDING TREE")
         _, f_points = tree.query(query_points, k=radius, n_jobs=-1)
-        print("TREE FOUND")
 
         # Get homogeneous representation of found points.
         h_points = np.c_[query_points, np.ones(query_points.shape[0])]

@@ -1,12 +1,13 @@
 import datetime
 import io
 import os
+from collections import namedtuple
 
 import numpy as np
 import xarray
 
 from .model import Model, shade, triangulate, interpolate
-from collections import namedtuple
+from ..utils import sph2cart
 
 region = namedtuple('region', 'num val')
 
@@ -16,8 +17,8 @@ def _read_multi_region_file(data):
     num_region, region_start = None, None
     num_regions = int(data[0])
     for i in range(num_regions):
-        region_start = region_start + num_region + 1 if region_start else 2
-        num_region = data[region_start-1] if num_region else data[1]
+        region_start = int(region_start + num_region + 1) if region_start else int(2)
+        num_region = int(data[region_start - 1]) if num_region else int(data[1])
         regions.append(data[region_start:region_start + num_region])
 
     return regions
@@ -89,9 +90,19 @@ class Ses3d(Model):
 
         # Add coordinates.
         for i, _ in enumerate(val_regions):
+            s_col, s_lon, s_rad = len(col_regions[i]), len(lon_regions[i]), len(rad_regions[i])
             self._data[i].coords['col'] = np.radians(col_regions[i])
             self._data[i].coords['lon'] = np.radians(lon_regions[i])
             self._data[i].coords['rad'] = rad_regions[i]
+
+            cols, lons, rads = np.meshgrid(self._data[i].coords['col'].values,
+                                           self._data[i].coords['lon'].values,
+                                           self._data[i].coords['rad'].values)
+
+            x, y, z = sph2cart(cols.ravel(), lons.ravel(), rads.ravel())
+            self._data[i]['x'] = (('col', 'lon', 'rad'), x.reshape((s_col, s_lon, s_rad)))
+            self._data[i]['y'] = (('col', 'lon', 'rad'), y.reshape((s_col, s_lon, s_rad)))
+            self._data[i]['z'] = (('col', 'lon', 'rad'), z.reshape((s_col, s_lon, s_rad)))
 
             # Add units.
             self._data[i].coords['col'].attrs['units'] = 'radians'

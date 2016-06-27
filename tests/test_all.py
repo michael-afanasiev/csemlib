@@ -1,6 +1,6 @@
 import os
-import numpy as np
 
+import numpy as np
 import pytest
 import xarray
 from meshpy.tet import MeshInfo, build, Options

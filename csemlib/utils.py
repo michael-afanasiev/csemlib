@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def sph2cart(col, lon, rad=1):
+def sph2cart(col, lon, rad):
     """
     Given spherical coordinates as input, returns their cartesian equivalent.
     :param col: Colatitude [radians].
@@ -10,7 +10,8 @@ def sph2cart(col, lon, rad=1):
     :return: x, y, z.
     """
 
-    if 0 > col or col > np.math.pi:
+    col, lon, rad = np.asarray(col), np.asarray(lon), np.asarray(rad)
+    if (0 > col).any() or (col > np.math.pi).any():
         raise ValueError('Colatitude must be in range [0, pi].')
 
     x = rad * np.sin(col) * np.cos(lon)
