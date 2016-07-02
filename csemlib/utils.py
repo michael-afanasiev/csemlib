@@ -40,3 +40,13 @@ def cart2sph(x, y, z):
     l = np.math.atan2(y, x)
 
     return r, c, l
+
+
+def rotate(x, y, z, matrix):
+
+    x, y, z = np.asarray(x), np.asarray(y), np.asarray(z)
+    return matrix.dot(np.array([x, y, z]))
+
+
+
+

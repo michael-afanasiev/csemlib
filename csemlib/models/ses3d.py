@@ -1,15 +1,12 @@
 import datetime
 import io
 import os
-from collections import namedtuple
 
 import numpy as np
 import xarray
 
 from .model import Model, shade, triangulate, interpolate
-from ..utils import sph2cart
-
-region = namedtuple('region', 'num val')
+from ..utils import sph2cart, rotate
 
 
 def _read_multi_region_file(data):
@@ -24,14 +21,38 @@ def _read_multi_region_file(data):
     return regions
 
 
+def _setup_rot_matrix(angle, x, y, z):
+    # Normalize vector.
+    norm = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+    x /= norm
+    y /= norm
+    z /= norm
+
+    # Setup matrix components.
+    matrix = np.empty((3, 3))
+    matrix[0, 0] = np.cos(angle) + (x ** 2) * (1 - np.cos(angle))
+    matrix[1, 0] = z * np.sin(angle) + x * y * (1 - np.cos(angle))
+    matrix[2, 0] = (-1) * y * np.sin(angle) + x * z * (1 - np.cos(angle))
+    matrix[0, 1] = x * y * (1 - np.cos(angle)) - z * np.sin(angle)
+    matrix[1, 1] = np.cos(angle) + (y ** 2) * (1 - np.cos(angle))
+    matrix[2, 1] = x * np.sin(angle) + y * z * (1 - np.cos(angle))
+    matrix[0, 2] = y * np.sin(angle) + x * z * (1 - np.cos(angle))
+    matrix[1, 2] = (-1) * x * np.sin(angle) + y * z * (1 - np.cos(angle))
+    matrix[2, 2] = np.cos(angle) + (z * z) * (1 - np.cos(angle))
+
+    return matrix
+
+
 class Ses3d(Model):
     """
     Class handling file-IO for a model in SES3D format.
     """
 
-    def __init__(self, name, directory,
-                 components=[], doi=None):
+    def __init__(self, name, directory, components=[],
+                 rotation_vector=None, rotation_angle=None, doi=None):
         super(Ses3d, self).__init__()
+        self.rot_angle = rotation_angle
+        self.rot_mat = rotation_vector
         self._data = []
         self.directory = directory
         self.components = components
@@ -99,7 +120,14 @@ class Ses3d(Model):
                                            self._data[i].coords['lon'].values,
                                            self._data[i].coords['rad'].values)
 
+            # Cartesian coordinates and rotation.
             x, y, z = sph2cart(cols.ravel(), lons.ravel(), rads.ravel())
+            if self.rot_mat:
+                if len(self.rot_mat) is not 3:
+                    raise ValueError("Rotation matrix must be a 3-vector.")
+                self.rot_mat = _setup_rot_matrix(np.radians(self.rot_angle), *self.rot_mat)
+                x, y, z = rotate(x, y, z, self.rot_mat)
+
             self._data[i]['x'] = (('col', 'lon', 'rad'), x.reshape((s_col, s_lon, s_rad)))
             self._data[i]['y'] = (('col', 'lon', 'rad'), y.reshape((s_col, s_lon, s_rad)))
             self._data[i]['z'] = (('col', 'lon', 'rad'), z.reshape((s_col, s_lon, s_rad)))
@@ -115,8 +143,22 @@ class Ses3d(Model):
             self._data[i].attrs['date'] = datetime.datetime.now().__str__()
             self._data[i].attrs['doi'] = self.doi
 
-    def write(self):
-        print('Writing')
+    def write(self, directory):
+
+        for block, comp in zip(['block_x', 'block_y', 'block_z'], ['col', 'lon', 'rad']):
+            with io.open(os.path.join(directory, block), 'w') as fh:
+                fh.write("1\n")
+                fh.write(str(len(self.data.coords[comp].values)) + "\n")
+                if block in ['block_x', 'block_y']:
+                    fh.write('\n'.join([str(num) for num in np.degrees(self.data.coords[comp].values)]))
+                else:
+                    fh.write('\n'.join([str(num) for num in self.data.coords[comp].values]))
+
+        for par in self.components:
+            with io.open(os.path.join(directory, par), 'w') as fh:
+                fh.write("1\n")
+                fh.write(str(len(self.data[par].values.ravel())) + "\n")
+                fh.write('\n'.join([str(num) for num in self.data[par].values.ravel()]))
 
     def eval(self, x, y, z, param=None, region=0):
         """
@@ -145,12 +187,14 @@ class Ses3d(Model):
         lons = lons.ravel()
         rads = rads.ravel()
 
-        # Generate tetrahedra.
+        # Generate tetrahedra. Currently this in spherical coordinates, as we need a convex hull.
         elements = triangulate(cols, lons, rads)
 
-        # Get interpolating functions.
+        # Get interpolating functions. Map cartesian coordinates for the interpolation.
         interp_param = []
-        indices, barycentric_coordinates = shade(x, y, z, cols, lons, rads, elements)
+        indices, barycentric_coordinates = shade(x, y, z, self.data['x'].values.ravel(),
+                                                 self.data['y'].values.ravel(), self.data['z'].values.ravel(),
+                                                 elements)
         for i, p in enumerate(param):
             interp_param.append(np.array(
                 interpolate(indices, barycentric_coordinates, self.data[p].values.ravel()), dtype=np.float64))

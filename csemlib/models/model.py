@@ -55,7 +55,7 @@ def interpolate(idx, bry, dat):
     return result
 
 
-def triangulate(x, y, z):
+def triangulate(x, y, z, true_x=None, true_y=None, true_z=None):
     """Triangulate a point cloud.
 
     Given a 3-D point cloud, defined by x, y, z, perform a Delauny triangulation
@@ -75,6 +75,9 @@ def triangulate(x, y, z):
     mesh_info.set_points(pts)
     opts = Options("Q")
     mesh = build(mesh_info, options=opts)
+    # if len(true_x) and len(true_y) and len(true_z):
+    #     mesh.set_points(np.array((true_x, true_y, true_z)).T)
+    #     mesh.write_vtk("/Users/michaelafanasiev/Desktop/test.vtk")
     return mesh.elements
 
 
