@@ -30,7 +30,7 @@ install:
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy pytest cython numba xarray pandas matplotlib
   - source activate test-environment
   - conda install geos proj4
-  - pip install pytest-cov codecov cartopy
+  - pip install pytest-cov codecov cartopy pyvtk
   - pip install -e .
 
 script:
