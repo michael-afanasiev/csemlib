@@ -11,6 +11,8 @@ import csemlib.models.crust as crust
 import csemlib.models.one_dimensional as m1d
 import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
+from csemlib.models.model import triangulate, write_vtk
+from csemlib.utils import cart2sph
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 DECIMAL_CLOSE = 3
@@ -210,3 +212,31 @@ def test_s20rts():
     vals = mod.eval(cols, lons, 6371, 'test').reshape(size, size).T
     dat = xarray.DataArray(vals, dims=['lat', 'lon'], coords=[90 - np.degrees(col), np.degrees(lon)])
     np.testing.assert_almost_equal(dat.values, true, decimal=DECIMAL_CLOSE)
+
+
+def test_s20rts_vtk():
+    """
+    Test to ensure that a vtk of s20rts is written succesfully.
+    :return:
+
+
+    """
+    s20mod = s20.S20rts()
+    s20mod.read()
+
+    rad = 6371.0
+    x, y, z = skl.fibonacci_sphere(500)
+    _, c, l = cart2sph(x, y, z)
+    vals = s20mod.eval(c, l, rad, 'test')
+
+    elements = triangulate(x,y,z)
+
+    pts = np.array((x, y, z)).T
+    write_vtk("test_s20rts.vtk", pts, elements, vals, 'vsh')
+
+
+
+
+
+
+
