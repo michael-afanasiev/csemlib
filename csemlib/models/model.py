@@ -11,6 +11,7 @@ from scipy.spatial.ckdtree import cKDTree
 
 
 
+
 class Model:
     """
     An abstract base class handling an external Earth model.
@@ -77,8 +78,32 @@ def triangulate(x, y, z, true_x=None, true_y=None, true_z=None):
     mesh = build(mesh_info, options=opts)
     # if len(true_x) and len(true_y) and len(true_z):
     #     mesh.set_points(np.array((true_x, true_y, true_z)).T)
-    #     mesh.write_vtk("/Users/michaelafanasiev/Desktop/test.vtk")
+    #     mesh.write_vtk("/Users/michaelafanasiev/Desktop/test.vtk", pts, tetra=mesh.elements)
     return mesh.elements
+
+
+def write_vtk(filename, points, vals, tetra, name=None):
+    """Writes a vtk from the given set of grid locations, values and connectivity
+
+    :param points: An ndarray containing all the grid locations in cartesion coordinates
+           in the form of:  | x0 y0 z0 |
+                            | :  :  :  |
+                            | xn yn zn |
+
+    :param vals: an array containing the values to be specified on the mesh
+    :param tetra: connectivity of the mesh
+
+    """
+    import pyvtk
+    from pyvtk import PointData, Scalars
+    vtkElements = pyvtk.VtkData(
+                    pyvtk.UnstructuredGrid(
+                    points,
+                    tetra=tetra),
+                    PointData(Scalars(vals, name)),
+                    "Mesh")
+
+    vtkElements.tofile(filename)
 
 
 def shade(x_target, y_target, z_target, x_mesh, y_mesh, z_mesh, elements):
