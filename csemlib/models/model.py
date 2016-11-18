@@ -82,7 +82,7 @@ def triangulate(x, y, z, true_x=None, true_y=None, true_z=None):
     return mesh.elements
 
 
-def write_vtk(filename, points, vals, tetra, name=None):
+def write_vtk(filename, points, tetra, vals, name=None):
     """Writes a vtk from the given set of grid locations, values and connectivity
 
     :param points: An ndarray containing all the grid locations in cartesion coordinates

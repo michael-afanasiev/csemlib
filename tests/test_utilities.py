@@ -23,7 +23,7 @@ def test_sph2cart():
 
 def test_cart2sph():
     np.testing.assert_almost_equal(np.array(utl.cart2sph(0, 0, 0)),
-                                   np.array((0, 0, 0)))
+                                   np.array((0, 1.5707963, 0)))
     np.testing.assert_almost_equal(np.array(utl.cart2sph(1, 0, 0)),
                                    np.array((1, np.math.pi / 2.0, 0)))
     np.testing.assert_almost_equal(np.array(utl.cart2sph(0, 1, 0)),

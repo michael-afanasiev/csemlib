@@ -30,15 +30,17 @@ def cart2sph(x, y, z):
     :return: colatitude, longitude, and radius
     """
 
+    x, y, z = np.asarray(x), np.asarray(y), np.asarray(z)
     r = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+
     # Break obviously if radius is zero. In that case we're just
     # at the center of the Earth.
-    try:
-        c = np.arccos(z / r)
-    except ZeroDivisionError:
-        return 0, 0, 0
-    l = np.arctan2(y, x)
+    with np.errstate(invalid='ignore'):
+        c = np.divide(z, r)
+        c = np.nan_to_num(c)
 
+    c = np.arccos(c)
+    l = np.arctan2(y, x)
     return r, c, l
 
 
