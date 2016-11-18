@@ -33,8 +33,7 @@ def cart2sph(x, y, z):
     x, y, z = np.asarray(x), np.asarray(y), np.asarray(z)
     r = np.sqrt(x ** 2 + y ** 2 + z ** 2)
 
-    # Break obviously if radius is zero. In that case we're just
-    # at the center of the Earth.
+    # Handle division by zero at the core
     with np.errstate(invalid='ignore'):
         c = np.divide(z, r)
         c = np.nan_to_num(c)
