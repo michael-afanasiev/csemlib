@@ -224,19 +224,47 @@ def test_s20rts_vtk():
     s20mod = s20.S20rts()
     s20mod.read()
 
-    rad = 6371.0
+    radius_earth = 6371.0
+    rad = 6346.63
+    rel_rad = rad/radius_earth
     x, y, z = skl.fibonacci_sphere(500)
     _, c, l = cart2sph(x, y, z)
     vals = s20mod.eval(c, l, rad, 'test')
 
     elements = triangulate(x,y,z)
 
-    pts = np.array((x, y, z)).T
+    pts = np.array((x, y, z)).T * rel_rad
     write_vtk("test_s20rts.vtk", pts, elements, vals, 'vsh')
 
 
+def test_3d_s20rts_vtk():
+    """
+    Test to ensure that a vtk of s20rts is written succesfully.
+    :return:
 
+    """
+    s20mod = s20.S20rts()
+    s20mod.read()
 
+    radii = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
+              5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
 
+    n_samples = 1000
+    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
+    r, c, l = cart2sph(x, y, z)
 
+    c = c[0:n_samples]
+    l = l[0:n_samples]
 
+    # all c and r are the same if the spheres are created with equal amounts of points
+    vals = s20mod.eval_new(c,l,radii[0], 'test')
+
+    for i in range(len(radii))[1:]:
+        new_vals = s20mod.eval_new(c,l, radii[i], 'test')
+        vals = np.append(vals, new_vals)
+
+    elements = triangulate(x,y,z)
+    pts = np.array((x, y, z)).T
+    write_vtk("test_3d_s20rts.vtk", pts, elements, vals, 'vs')
+
+# Write something that returns absolute values based on 1d prem and accounts for
