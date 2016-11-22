@@ -26,12 +26,13 @@ def multiple_fibonacci_spheres(radii, n_samples):
     :param radii: array describing this distances from the core in km, ordered from shallow to deep?
     :return layer index:
     """
+    r_earth = 6371.0
     num_layers = len(radii)
     pts = np.array(fibonacci_sphere(n_samples))
-    all_layers = pts
+    all_layers = pts * radii[0] / r_earth
 
     if num_layers > 1:
         for rad in radii[1:]:
-            all_layers = np.append(all_layers, pts * rad/radii[0], axis=1)
+            all_layers = np.append(all_layers, pts * rad/r_earth, axis=1)
 
     return all_layers

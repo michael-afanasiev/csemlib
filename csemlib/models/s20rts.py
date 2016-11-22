@@ -3,7 +3,13 @@ import os
 
 import numpy as np
 from scipy.special import sph_harm
-from csemlib.models.model import Model
+
+from csemlib.background.skeleton import multiple_fibonacci_spheres
+from csemlib.models.model import Model, triangulate, write_vtk
+from csemlib.utils import cart2sph, sph2cart
+
+s20_layers = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
+              5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
 
 
 class S20rts(Model):
@@ -18,6 +24,10 @@ class S20rts(Model):
         super(S20rts, self).__init__()
         directory, _ = os.path.split(os.path.split(__file__)[0])
         self.directory = os.path.join(directory, 'data', 's20rts')
+        self.layers = np.array([6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79,
+                                5872.18, 5774.69, 5667.44, 5549.46, 5419.68,5276.89, 5119.82,
+                                4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96])
+        self.r_earth = 6371.0
 
     def read(self):
         coeff_file = os.path.join(self.directory, 'S20RTS.dat')
@@ -38,7 +48,7 @@ class S20rts(Model):
         pass
 
     def eval(self, c, l, rad, param):
-        idx = find_layer_idx(rad)
+        idx = self.find_layer_idx(rad)
         val = np.zeros_like(c)
         for n in range(20):
             imag, real = 1, 0
@@ -52,22 +62,93 @@ class S20rts(Model):
 
         return val
 
-def find_layer_idx(rad):
-    """
-    Return the index of the s20rts layer for the requested depth
-    :param rad: distance from core in km
-    :return layer index:
-    """
+    def eval_point_cloud(self, c, l, r, param):
+        """
+        This returns the linearly interpolated perturbations of s20rts. Careful only points that fall inside
+        of the domain of s20rts are returned.
+        :param c: colatitude
+        :param l: longitude
+        :param r: normalised distance from core in km
+        :param param: param to be returned - currently not used
+        :return c, l, r, vals: Re
+        """
+        pts = np.array((c, l, r)).T
+        s20_lay_norm = self.layers / self.r_earth
 
-    s20_layers = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
-              5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
+        # Sorted array, probably not necessary anymore
+        pts_sorted = np.asarray(sorted(pts, key=lambda pts_entry: pts_entry[2], reverse=True))
 
-    if rad < s20_layers[-1]:
-        raise ValueError('Requested layer out of bounds for s20rts')
+        # Initialize arrays to store evaluated points in the correct order
+        vals = np.zeros(0)
+        c = np.zeros(0)
+        l = np.zeros(0)
+        r = np.zeros(0)
 
-    idx, nearest_layer_depth = min(enumerate(s20_layers), key=lambda x: abs(x[1] - rad))
+        for i in range(len(s20_layers) - 1):
+            upper_rad_norm = s20_lay_norm[i]
+            lower_rad_norm = s20_lay_norm[i+1]
+            upper_rad = s20_layers[i]
+            lower_rad = s20_layers[i+1]
 
-    if rad < nearest_layer_depth:
-        idx += 1
+            # Extract chunk for interpolation
+            # Discard everything above chunk
+            if i == 0:
+                chunk = pts_sorted[pts_sorted[:, 2] <= upper_rad_norm + np.finfo(float).eps]
+            else:
+                chunk = pts_sorted[pts_sorted[:, 2] <= upper_rad_norm]
 
-    return idx
+            # Discard everything below chunk
+            if i < len(s20_layers) - 2:
+                chunk = chunk[chunk[:, 2] > lower_rad_norm]
+            else:
+                chunk = chunk[chunk[:, 2] >= lower_rad_norm - np.finfo(float).eps]
+
+            chunk_c, chunk_l, chunk_r = chunk.T
+
+            # Evaluate S20RTS at upper and lower end of chunk, use these to interpolate
+            top_vals = self.eval(chunk_c, chunk_l, upper_rad, 'test')
+            bottom_vals = self.eval(chunk_c, chunk_l, lower_rad, 'test')
+
+            chunk_vals = self.linear_interpolation(bottom_vals, top_vals, lower_rad_norm, upper_rad_norm, chunk_r)
+            vals = np.append(vals, chunk_vals)
+            c = np.append(c, chunk_c)
+            r = np.append(r, chunk_r)
+            l = np.append(l, chunk_l)
+
+        return c, l, r, vals
+
+    def find_layer_idx(self, rad):
+        """
+        Return the index of the s20rts layer for the requested depth
+        :param rad: distance from core in km
+        :return layer index:
+        """
+
+        s20_layers = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
+                  5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
+
+        if rad < s20_layers[-1] or rad > s20_layers[0]:
+            raise ValueError('Requested layer out of bounds for s20rts')
+
+        layer_idx, nearest_layer_depth = min(enumerate(s20_layers), key=lambda x: abs(x[1] - rad))
+
+        if rad < nearest_layer_depth:
+            layer_idx += 1
+
+        return layer_idx
+
+    def linear_interpolation(self, bottom_vals, top_vals, bottom_rad, top_rad, rads):
+        """
+        Returns the linear interpolated value
+        :param bottom_vals: perturbation at layer below point
+        :param top_vals: perturbation at layer above point
+        :param bottom_rad: radius of the layer below
+        :param top_rad: radius of the layer above
+        :param rads: radius of the to be interpolated value
+        :return: vals: interpolated results
+        """
+
+        vals = (top_vals - bottom_vals)/(top_rad-bottom_rad) *\
+               (rads - bottom_rad) + bottom_vals
+
+        return vals
