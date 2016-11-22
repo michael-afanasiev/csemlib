@@ -12,7 +12,7 @@ import csemlib.models.one_dimensional as m1d
 import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
 from csemlib.models.model import triangulate, write_vtk
-from csemlib.utils import cart2sph
+from csemlib.utils import cart2sph, sph2cart
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 DECIMAL_CLOSE = 3
@@ -208,13 +208,14 @@ def test_s20rts():
     col = np.linspace(0, np.pi, size)
     lon = np.linspace(0, 2 * np.pi, size)
     cols, lons = np.meshgrid(col, lon)
+    rad = mod.layers[0]
 
-    vals = mod.eval(cols, lons, 6371, 'test').reshape(size, size).T
+    vals = mod.eval(cols, lons, rad, 'test').reshape(size, size).T
     dat = xarray.DataArray(vals, dims=['lat', 'lon'], coords=[90 - np.degrees(col), np.degrees(lon)])
     np.testing.assert_almost_equal(dat.values, true, decimal=DECIMAL_CLOSE)
 
 
-def test_s20rts_vtk():
+def test_s20rts_vtk_single_sphere():
     """
     Test to ensure that a vtk of s20rts is written succesfully.
     :return:
@@ -224,19 +225,84 @@ def test_s20rts_vtk():
     s20mod = s20.S20rts()
     s20mod.read()
 
-    rad = 6371.0
+    radius_earth = 6371.0
+    rad = 6346.63
+    rel_rad = rad/radius_earth
     x, y, z = skl.fibonacci_sphere(500)
     _, c, l = cart2sph(x, y, z)
     vals = s20mod.eval(c, l, rad, 'test')
 
     elements = triangulate(x,y,z)
 
+    pts = np.array((x, y, z)).T * rel_rad
+    write_vtk("test_s20rts.vtk", pts, elements, vals, 'vs')
+
+
+def test_3d_s20rts_vtk():
+    """
+    Test to ensure that a vtk of s20rts is written succesfully.
+    :return:
+
+    """
+    s20mod = s20.S20rts()
+    s20mod.read()
+
+    radii = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
+              5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
+
+    n_samples = 1000
+    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
+    r, c, l = cart2sph(x, y, z)
+
+    c = c[0:n_samples]
+    l = l[0:n_samples]
+
+    # all c and r are the same if the spheres are created with equal amounts of points
+    vals = s20mod.eval(c,l,radii[0], 'test')
+
+    for i in range(len(radii))[1:]:
+        new_vals = s20mod.eval(c,l, radii[i], 'test')
+        vals = np.append(vals, new_vals)
+
+    elements = triangulate(x,y,z)
     pts = np.array((x, y, z)).T
-    write_vtk("test_s20rts.vtk", pts, elements, vals, 'vsh')
+    write_vtk("test_3d_s20rts.vtk", pts, elements, vals, 'vs')
 
 
+def test_s20rts_point_cloud():
+    """
+    Test to ensure that a vtk of s20rts is written succesfully.
+    :return:
 
+    """
+    # Initialize s20rts
+    s20mod = s20.S20rts()
+    s20mod.read()
 
+    # Generate point cloud
+    n_samples = 100
+    n_layers = 10
+    radii = np.linspace(s20mod.layers[0], s20mod.layers[-1], n_layers)
+    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
+    r, c, l = cart2sph(x, y, z)
 
+    # Evaluate points
+    c, l, r, vals = s20mod.eval_point_cloud(c, l, r, 'test')
 
+    # Generate coordinates and mesh connectivity
+    x, y, z = sph2cart(c, l, r)
+    elements = triangulate(x,y,z)
+
+    # Write to vtk
+    pts = np.array((x, y, z)).T
+    write_vtk("test_3d_s20rts.vtk", pts, elements, vals, 'vs')
+
+def test_s20rts_out_of_bounds():
+    mod = s20.S20rts()
+
+    with pytest.raises(ValueError):
+        mod.find_layer_idx(3200)
+
+    with pytest.raises(ValueError):
+        mod.find_layer_idx(7000)
 
