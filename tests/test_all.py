@@ -280,7 +280,7 @@ def test_s20rts_point_cloud():
     s20mod.read()
 
     # Generate point cloud
-    n_samples = 1000
+    n_samples = 100
     n_layers = 10
     radii = np.linspace(s20mod.layers[0], s20mod.layers[-1], n_layers)
     x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
@@ -296,3 +296,13 @@ def test_s20rts_point_cloud():
     # Write to vtk
     pts = np.array((x, y, z)).T
     write_vtk("test_3d_s20rts.vtk", pts, elements, vals, 'vs')
+
+def test_s20rts_out_of_bounds():
+    mod = s20.S20rts()
+
+    with pytest.raises(ValueError):
+        mod.find_layer_idx(3200)
+
+    with pytest.raises(ValueError):
+        mod.find_layer_idx(7000)
+

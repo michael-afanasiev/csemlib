@@ -8,9 +8,6 @@ from csemlib.background.skeleton import multiple_fibonacci_spheres
 from csemlib.models.model import Model, triangulate, write_vtk
 from csemlib.utils import cart2sph, sph2cart
 
-s20_layers = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
-              5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
-
 
 class S20rts(Model):
     """
@@ -84,11 +81,11 @@ class S20rts(Model):
         l = np.zeros(0)
         r = np.zeros(0)
 
-        for i in range(len(s20_layers) - 1):
+        for i in range(len(self.layers) - 1):
             upper_rad_norm = s20_lay_norm[i]
             lower_rad_norm = s20_lay_norm[i+1]
-            upper_rad = s20_layers[i]
-            lower_rad = s20_layers[i+1]
+            upper_rad = self.layers[i]
+            lower_rad = self.layers[i+1]
 
             # Extract chunk for interpolation
             # Discard everything above chunk
@@ -98,7 +95,7 @@ class S20rts(Model):
                 chunk = pts_sorted[pts_sorted[:, 2] <= upper_rad_norm]
 
             # Discard everything below chunk
-            if i < len(s20_layers) - 2:
+            if i < len(self.layers) - 2:
                 chunk = chunk[chunk[:, 2] > lower_rad_norm]
             else:
                 chunk = chunk[chunk[:, 2] >= lower_rad_norm - np.finfo(float).eps]
@@ -124,13 +121,10 @@ class S20rts(Model):
         :return layer index:
         """
 
-        s20_layers = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
-                  5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
-
-        if rad < s20_layers[-1] or rad > s20_layers[0]:
+        if rad < self.layers[-1] or rad > self.layers[0]:
             raise ValueError('Requested layer out of bounds for s20rts')
 
-        layer_idx, nearest_layer_depth = min(enumerate(s20_layers), key=lambda x: abs(x[1] - rad))
+        layer_idx, nearest_layer_depth = min(enumerate(self.layers), key=lambda x: abs(x[1] - rad))
 
         if rad < nearest_layer_depth:
             layer_idx += 1
