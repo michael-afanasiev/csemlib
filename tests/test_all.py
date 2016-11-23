@@ -225,9 +225,8 @@ def test_s20rts_vtk_single_sphere():
     s20mod = s20.S20rts()
     s20mod.read()
 
-    radius_earth = 6371.0
-    rad = 6346.63
-    rel_rad = rad/radius_earth
+    rad = s20mod.layers[0]
+    rel_rad = rad/ s20mod.r_earth
     x, y, z = skl.fibonacci_sphere(500)
     _, c, l = cart2sph(x, y, z)
     vals = s20mod.eval(c, l, rad, 'test')
@@ -304,5 +303,8 @@ def test_s20rts_out_of_bounds():
         mod.find_layer_idx(3200)
 
     with pytest.raises(ValueError):
-        mod.find_layer_idx(7000)
+        mod.find_layer_idx(6204)
+
+    with pytest.raises(ValueError):
+        mod.eval(0, 0, 7000, 'test')
 
