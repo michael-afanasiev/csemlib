@@ -343,3 +343,18 @@ def test_add_crust_to_prem():
     # Write to vtk
     points = np.array((x, y, z)).T
     write_vtk("crust_vs.vtk", points, elements, pts[:, 5], 'vs')
+
+def test_vectorized_prem():
+    # Generate point cloud
+    n_samples = 10
+    n_layers = 100
+    radii = np.linspace(6371.0, 0.0, n_layers)
+
+
+    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
+    r, c, l = cart2sph(x, y, z)
+
+    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
+
+    with pytest.raises(ValueError):
+        m1d.prem_eval_point_cloud([-1.0])
