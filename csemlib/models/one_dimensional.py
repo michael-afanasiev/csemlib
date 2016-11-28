@@ -170,7 +170,7 @@ def prem_no220_no_regions(rad):
     elif rad < 0:
         raise ValueError('Negative radius specified for 1D_prem')
 
-def prem_no220_vectorized(rad):
+def prem_eval_point_cloud(rad):
     g = np.vectorize(prem_no220_no_regions)
     rho, vpv, vsv, vsh = g(rad)
     return rho, vpv, vsv, vsh

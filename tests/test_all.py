@@ -162,7 +162,6 @@ def test_ses3d():
         mod.data.coords['rad'].values)
     interp = mod.eval(mod.data['x'].values.ravel(), mod.data['y'].values.ravel(),
                       mod.data['z'].values.ravel(), param=['dvsv', 'drho', 'dvsh', 'dvp'])
-    
     # Setup true data.
     true = np.empty((len(all_cols.ravel()), 4))
     true[:, 0] = mod.data['dvsv'].values.ravel()
@@ -308,3 +307,39 @@ def test_s20rts_out_of_bounds():
     with pytest.raises(ValueError):
         mod.eval(0, 0, 7000, 'test')
 
+def test_add_crust_to_prem():
+    # Generate point cloud
+    n_samples = 300
+    n_layers = 10
+    radii = np.linspace(6371.0, 0.0, n_layers)
+    r_earth = 6371.0
+
+    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
+    r, c, l = cart2sph(x, y, z)
+
+    # Evaluate Prem
+    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
+
+    # Split into crustal and non crustal zone
+    pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
+    cst_zone = pts[pts[:, 2] >= (r_earth - 100.0)]
+    non_cst_zone = pts[pts[:, 2] < (r_earth - 100.0)]
+
+    # Compute crustal depths and vs for crustal zone coordinates
+    cst = crust.Crust()
+    cst.read()
+    crust_dep = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1)
+    crust_vs = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=1)
+
+    cst_zone[:, 5] = crust.add_crust(cst_zone[:, 2], crust_dep, crust_vs, cst_zone[:, 5])
+
+    # Append crustal and non crustal zone back together
+    pts = np.append(cst_zone, non_cst_zone, axis=0)
+
+    # Generate mesh for plotting
+    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/6371.0)
+    elements = triangulate(x, y, z)
+
+    # Write to vtk
+    points = np.array((x, y, z)).T
+    write_vtk("crust_vs.vtk", points, elements, pts[:, 5], 'vs')
