@@ -45,19 +45,32 @@ class S20rts(Model):
         pass
 
     def eval(self, c, l, rad, param):
+        """
+        This returns the perturbation as defined in s20rts. Only one rad can be handled at a time, while
+        c and l can be given in the form of 1D arrays
+        :param c: colatitude,
+        :param l: longitude,
+        :param rad: distance from core in km
+        :param param: param to be returned - currently not used
+        :return vals
+        """
+
+        if rad not in self.layers:
+            raise ValueError('Requested layer not defined in s20rts, use interpolation function')
         idx = self.find_layer_idx(rad)
-        val = np.zeros_like(c)
+
+        vals = np.zeros_like(c)
         for n in range(20):
             imag, real = 1, 0
             for m in range(2 * n + 1):
                 if m == 0 or (m % 2):
-                    val += getattr(self, 'l%d' % idx)[n][m] * np.real(sph_harm(real, n, l, c))
+                    vals += getattr(self, 'l%d' % idx)[n][m] * np.real(sph_harm(real, n, l, c))
                     real += 1
                 else:
-                    val += getattr(self, 'l%d' % idx)[n][m] * np.imag(sph_harm(imag, n, l, c))
+                    vals += getattr(self, 'l%d' % idx)[n][m] * np.imag(sph_harm(imag, n, l, c))
                     imag += 1
 
-        return val
+        return vals
 
     def eval_point_cloud(self, c, l, r, param):
         """
@@ -67,7 +80,7 @@ class S20rts(Model):
         :param l: longitude
         :param r: normalised distance from core in km
         :param param: param to be returned - currently not used
-        :return c, l, r, vals: Re
+        :return c, l, r, vals
         """
         pts = np.array((c, l, r)).T
         s20_lay_norm = self.layers / self.r_earth
@@ -120,14 +133,10 @@ class S20rts(Model):
         :param rad: distance from core in km
         :return layer index:
         """
+        if rad not in self.layers:
+            raise ValueError('Requested layer not defined in s20rts, use interpolation function')
 
-        if rad < self.layers[-1] or rad > self.layers[0]:
-            raise ValueError('Requested layer out of bounds for s20rts')
-
-        layer_idx, nearest_layer_depth = min(enumerate(self.layers), key=lambda x: abs(x[1] - rad))
-
-        if rad < nearest_layer_depth:
-            layer_idx += 1
+        layer_idx, _ = min(enumerate(self.layers), key=lambda x: abs(x[1] - rad))
 
         return layer_idx
 

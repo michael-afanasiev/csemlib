@@ -55,10 +55,10 @@ class Crust(Model):
     def write(self):
         pass
 
-    def eval(self, x, y, z=0, param=None):
+    def eval(self, x, y, z=0, param=None, crust_smooth_factor=1e5):
 
         # This is a heuristic.
-        crust_smooth_factor = 1e5
+        #crust_smooth_factor = 1e5
 
         # Create smoother object.
         lut = interp.RectSphereBivariateSpline(self._data.coords['col'][::-1],
@@ -68,4 +68,19 @@ class Crust(Model):
 
         # Because the colatitude array is reversed, we must also reverse the request.
         x = np.pi - x
+
+        # Because we use a definition of longitude ranging between -pi and pi
+        # convert negative longitudes to positive longitudes, RectSphereBivariateSpline requires this
+        y[y < 0] = np.pi - y[y < 0]
         return lut.ev(x, y)
+
+
+def add_crust(r, crust_dep, crust_vs, param):
+    r_earth = 6371.0
+    for i in range(len(r)):
+        if r[i] > (r_earth - crust_dep[i]):
+            # Do something with param here
+            param[i] = crust_vs[i]
+        else:
+            continue
+    return param
