@@ -4,8 +4,10 @@ import os
 import numpy as np
 import scipy.interpolate as interp
 import xarray
+from csemlib.background.skeleton import fibonacci_sphere
 
-from csemlib.models.model import Model
+from csemlib.models.model import Model, write_vtk, triangulate
+from csemlib.utils import cart2sph
 
 
 class Topography(Model):
@@ -20,39 +22,45 @@ class Topography(Model):
 
         directory = os.path.split(os.path.split(__file__)[0])[0]
         self.directory = os.path.join(directory, 'data', 'topography')
-        self.col = np.zeros(0)
-        self.lon = np.zeros(0)
-        self.topo = np.zeros(0)
 
     def data(self):
         pass
 
     def read(self):
 
-        col = np.linspace(1, 179, 180*6+1)
-        lon = np.linspace(0, 360, 360*6+1)
+        initial_reading = True
 
-        for p in ['topo']:
+        if initial_reading:
+            # Initial Reading
+            vals = np.genfromtxt(os.path.join(self.directory, '10MinuteTopoGrid.txt'), delimiter=',')
+            _, _, topo = vals.T
 
-            with io.open(os.path.join(self.directory, 'new_vals'), 'rt') as fh:
-                val = np.asarray(fh.readlines(), dtype=float)
-            # val_new = []
-            # for i in range(len(val)):
-            #     if (i + 1) % len(lon) == 0:
-            #         continue
-            #
-            #     else:
-            #         val_new.append(val[i])
-            #
-            #
-            # val = np.array(val_new)
-            # np.savetxt(os.path.join(self.directory, 'new_vals'), val_new)
-            lon = np.linspace(1, 360, 360*6, endpoint=False)
-            val = val.reshape(len(col), len(lon))
-            self._data[p] = (('col', 'lon'), val)
-            if p == 'topo':
-                self._data[p].attrs['units'] = 'km'
+            initial_lon = np.linspace(-180, 180, 360 * 6 + 1)
+            initial_col = np.linspace(-90, 90, 180 * 6 + 1)
 
+            topo = np.array(topo)
+            topo_reshaped = topo.reshape(len(initial_col), len(initial_lon))
+
+            # Resample such that there are no points at the poles
+            resampled = topo_reshaped[1::2, 1::2]
+            topo_1d = resampled.reshape(np.size(resampled))
+            np.savetxt(os.path.join(self.directory, 'topo_resampled'), topo_1d, fmt='%.0f')
+
+        val = np.genfromtxt(os.path.join(self.directory, 'topo_resampled'))
+        # new sampling:
+        start = 1.0/6.0
+        col = np.linspace(start, 180 - start, 540)
+        lon = np.linspace(start, 360 - start, 1080)
+        # Reshape
+        val = val.reshape(len(col), len(lon))
+
+        # Convert to km
+        val /= 1000.0
+        self._data['topo'] = (('col', 'lon'), val)
+        self._data['topo'].attrs['units'] = 'km'
+
+        print(np.min(val))
+        print(np.max(val))
 
         # Add coordinates.
         self._data.coords['col'] = np.radians(col)
@@ -66,26 +74,43 @@ class Topography(Model):
     def write(self):
         pass
 
-    def eval(self, x, y, z=0, param=None, crust_smooth_factor=1e5):
+    def eval(self, x, y, z=0, param=None, topo_smooth_factor=0):
 
         # This is a heuristic.
-        #crust_smooth_factor = 1e5
+        #topo_smooth_factor = 1e5
 
         # Create smoother object.
         lut = interp.RectSphereBivariateSpline(self._data.coords['col'],
                                                self._data.coords['lon'],
-                                               self._data[param])
+                                               self._data[param],s=topo_smooth_factor)
 
-        # Because the colatitude array is reversed, we must also reverse the request.
-        x = np.pi - x
 
-        # Because we use a definition of longitude ranging between -pi and pi
-        # convert negative longitudes to positive longitudes, RectSphereBivariateSpline requires this
-        # y[y < 0] = np.pi - y[y < 0]
+        # Convert to coordinate system used for topography 0-2pi instead of -pi-pi
+        y = y + np.pi
         return lut.ev(x, y)
 
 
-topo = Topography()
-topo.read()
-# print(np.size(topo._data['topo']))
-print(topo.eval(0.0,1, param='topo'))
+def topo_test():
+    """
+    Test to ensure that a vtk of s20rts is written succesfully.
+    :return:
+
+
+    """
+    topo = Topography()
+    topo.read()
+
+    x, y, z = fibonacci_sphere(10000)
+    _, c, l = cart2sph(x, y, z)
+
+    vals = topo.eval(c, l, param='topo')
+
+    print(min(vals))
+    print(max(vals))
+    elements = triangulate(x, y, z)
+
+    pts = np.array((x, y, z)).T
+    write_vtk("topo.vtk", pts, elements, vals, 'topo')
+
+
+topo_test()

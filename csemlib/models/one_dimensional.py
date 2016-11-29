@@ -185,7 +185,7 @@ def prem_eval_point_cloud(rad):
 
 def test_add_crust_and_s20rts_prem():
     # Generate point cloud
-    num_layers = 100
+    num_layers = 5
     radii = np.linspace(6371.0, 0.0, num_layers)
     r_earth = 6371.0
     res = r_earth / num_layers
