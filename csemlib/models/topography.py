@@ -59,9 +59,6 @@ class Topography(Model):
         self._data['topo'] = (('col', 'lon'), val)
         self._data['topo'].attrs['units'] = 'km'
 
-        print(np.min(val))
-        print(np.max(val))
-
         # Add coordinates.
         self._data.coords['col'] = np.radians(col)
         self._data.coords['lon'] = np.radians(lon)
