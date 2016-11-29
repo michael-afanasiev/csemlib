@@ -87,7 +87,6 @@ class S20rts(Model):
 
         # Sorted array, probably not necessary anymore
         pts_sorted = np.asarray(sorted(pts, key=lambda pts_entry: pts_entry[2], reverse=True))
-
         # Initialize arrays to store evaluated points in the correct order
         vals = np.zeros(0)
         c = np.zeros(0)
@@ -126,6 +125,75 @@ class S20rts(Model):
             l = np.append(l, chunk_l)
 
         return c, l, r, vals
+
+    def split_domains(self, pts):
+        # Split array in two zones
+        s20rts_dmn = pts[pts[:, 2] <= self.layers[0]]
+        s20rts_dmn = s20rts_dmn[s20rts_dmn[:, 2] >= self.layers[-1]]
+        above_dmn = pts[pts[:, 2] > self.layers[0]]
+        below_dmn = pts[pts[:, 2] < self.layers[-1]]
+        non_s20_dmn = np.append(above_dmn, below_dmn, axis=0)
+        return s20rts_dmn, non_s20_dmn
+
+
+
+    def eval_point_cloud_non_norm(self, c, l, r, param):
+        """
+        This returns the linearly interpolated perturbations of s20rts. Careful only points that fall inside
+        of the domain of s20rts are returned.
+        :param c: colatitude
+        :param l: longitude
+        :param r: distance from core in km
+        :param param: param to be returned - currently not used
+        :return c, l, r, vals
+        """
+
+        pts = np.array((c, l, r, param)).T
+        s20rts_dmn, non_s20_dmn = self.split_domains(pts)
+
+        # Initialize arrays to store evaluated points in the correct order
+        c = np.zeros(0)
+        l = np.zeros(0)
+        r = np.zeros(0)
+        param = np.zeros(0)
+
+        # Only run when it exists
+        if len(s20rts_dmn) > 0:
+            for i in range(len(self.layers) - 1):
+                upper_rad = self.layers[i]
+                lower_rad = self.layers[i+1]
+
+                # Extract chunk for interpolation
+                if i == 0:
+                    chunk = s20rts_dmn[s20rts_dmn[:, 2] <= upper_rad + np.finfo(float).eps]
+                else:
+                    chunk = s20rts_dmn[s20rts_dmn[:, 2] <= upper_rad]
+
+                if i < len(self.layers) - 2:
+                    chunk = chunk[chunk[:, 2] > lower_rad]
+                else:
+                    chunk = chunk[chunk[:, 2] >= lower_rad - np.finfo(float).eps]
+
+                chunk_c, chunk_l, chunk_r, chunk_param = chunk.T
+
+                # Evaluate S20RTS at upper and lower end of chunk, use these to interpolate
+                top_vals = self.eval(chunk_c, chunk_l, upper_rad, 'test')
+                bottom_vals = self.eval(chunk_c, chunk_l, lower_rad, 'test')
+
+                # Interpolate
+                chunk_vals = self.linear_interpolation(bottom_vals, top_vals, lower_rad, upper_rad, chunk_r)
+
+                # Store perturbed values
+                chunk_param *= (1 + chunk_vals)
+                param = np.append(param, chunk_param)
+                c = np.append(c, chunk_c)
+                r = np.append(r, chunk_r)
+                l = np.append(l, chunk_l)
+
+        s20rts_dmn = np.array((c, l, r, param)).T
+        pts = np.append(s20rts_dmn, non_s20_dmn, axis=0)
+
+        return pts
 
     def find_layer_idx(self, rad):
         """

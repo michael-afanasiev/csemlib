@@ -5,7 +5,8 @@ import numpy as np
 import scipy.interpolate as interp
 import xarray
 
-from .model import Model
+#from .model import Model
+from csemlib.models.model import Model
 
 
 class Crust(Model):
@@ -74,6 +75,27 @@ class Crust(Model):
         y[y < 0] = np.pi - y[y < 0]
         return lut.ev(x, y)
 
+    def eval_point_cloud(self, c, l, r, param):
+
+        pts = np.array((c, l, r, param)).T
+        r_earth = 6371.0
+        # Split into crustal and non crustal zone
+
+        cst_zone = pts[pts[:, 2] >= (r_earth - 100.0)]
+        non_cst_zone = pts[pts[:, 2] < (r_earth - 100.0)]
+
+        # Compute crustal depths and vs for crustal zone coordinates
+        self.read()
+        crust_dep = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1e1)
+        crust_vs = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=0)
+
+        cst_zone[:, 3] = add_crust(cst_zone[:, 2], crust_dep, crust_vs, cst_zone[:, 3])
+
+        # Append crustal and non crustal zone back together
+        pts = np.append(cst_zone, non_cst_zone, axis=0)
+
+        return pts
+
 
 def add_crust(r, crust_dep, crust_vs, param):
     r_earth = 6371.0
@@ -84,3 +106,7 @@ def add_crust(r, crust_dep, crust_vs, param):
         else:
             continue
     return param
+
+cst = Crust()
+cst.read()
+print(np.shape(cst._data['crust_vs']))

@@ -1,5 +1,13 @@
 import numpy as np
 
+from csemlib.background.skeleton import multiple_fibonacci_spheres, multiple_fibonacci_resolution
+from csemlib.models import crust
+from csemlib.models.model import triangulate
+from csemlib.models.model import write_vtk
+from csemlib.models.s20rts import S20rts
+from csemlib.utils import sph2cart, cart2sph
+
+
 def prem_no220(rad, region=None):
     regions = {'upper_mantle', 'transition_zone', 'lower_mantle', 'outer_core',
                'inner_core'}
@@ -174,3 +182,37 @@ def prem_eval_point_cloud(rad):
     g = np.vectorize(prem_no220_no_regions)
     rho, vpv, vsv, vsh = g(rad)
     return rho, vpv, vsv, vsh
+
+def test_add_crust_and_s20rts_prem():
+    # Generate point cloud
+    num_layers = 100
+    radii = np.linspace(6371.0, 0.0, num_layers)
+    r_earth = 6371.0
+    res = r_earth / num_layers
+
+    x, y, z = multiple_fibonacci_resolution(radii, resolution=res, min_samples=10)
+    #x, y, z = multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
+    r, c, l = cart2sph(x, y, z)
+
+    # Evaluate Prem
+    rho, vpv, vsv, vsh = prem_eval_point_cloud(r)
+    pts = np.array((c, l, r, vsv))
+
+    # Evaluate s20rts
+    s20mod = S20rts()
+    s20mod.read()
+    pts = s20mod.eval_point_cloud_non_norm(*pts)
+
+    cst = crust.Crust()
+    pts = cst.eval_point_cloud(*pts.T)
+
+    # Generate mesh for plotting (normalised coordinates)
+    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/ r_earth)
+    elements = triangulate(x, y, z)
+
+    # Write to vtk
+    coords = np.array((x, y, z)).T
+
+    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 3], 'vsv')
+
+test_add_crust_and_s20rts_prem()

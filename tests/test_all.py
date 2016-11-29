@@ -358,3 +358,61 @@ def test_vectorized_prem():
 
     with pytest.raises(ValueError):
         m1d.prem_eval_point_cloud([-1.0])
+
+
+def test_add_crust_and_s20rts_prem():
+    # Generate point cloud
+    n_samples = 300
+    n_layers = 10
+    radii = np.linspace(6371.0, 0.0, n_layers)
+    r_earth = 6371.0
+
+    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
+    r, c, l = cart2sph(x, y, z)
+
+    # Evaluate Prem
+    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
+
+
+    # Evaluate s20rts
+    s20mod = s20.S20rts()
+    s20mod.read()
+
+    pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
+
+    s20rts_zone = pts[pts[:, 2] >= s20mod.layers[-1]]
+    s20rts_zone = pts[pts[:, 2] <= s20mod.layers[0]]
+
+    above_s20rts_zone = pts[pts[:, 2] > s20mod.layers[0]]
+    below_s20rts_zone = pts[pts[:, 2] < s20mod.layers[-1]]
+
+    non_s20rts_zone = np.append(above_s20rts_zone, below_s20rts_zone, axis=1)
+    s20rts_zone[:, 0], s20rts_zone[:, 1], s20rts_zone[:, 2], s20rts_zone[:, 5] = \
+        s20mod.eval_point_cloud(s20rts_zone[:, 0], s20rts_zone[:, 1],
+                                s20rts_zone[:, 2], s20rts_zone[:, 5])
+
+    pts = np.append(non_s20rts_zone, s20rts_zone, axis=1)
+
+    # Split into crustal and non crustal zone
+    pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
+    cst_zone = pts[pts[:, 2] >= (r_earth - 100.0)]
+    non_cst_zone = pts[pts[:, 2] < (r_earth - 100.0)]
+
+    # Compute crustal depths and vs for crustal zone coordinates
+    cst = crust.Crust()
+    cst.read()
+    crust_dep = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1)
+    crust_vs = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=1)
+
+    cst_zone[:, 5] = crust.add_crust(cst_zone[:, 2], crust_dep, crust_vs, cst_zone[:, 5])
+
+    # Append crustal and non crustal zone back together
+    pts = np.append(cst_zone, non_cst_zone, axis=0)
+
+    # Generate mesh for plotting
+    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/6371.0)
+    elements = triangulate(x, y, z)
+
+    # Write to vtk
+    points = np.array((x, y, z)).T
+    write_vtk("crust_vs.vtk", points, elements, pts[:, 5], 'vs')

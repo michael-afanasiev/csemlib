@@ -47,3 +47,37 @@ def multiple_fibonacci_spheres(radii, n_samples, normalized_radius=True):
                 all_layers = np.append(all_layers, pts * rad, axis=1)
 
     return all_layers
+
+def multiple_fibonacci_resolution(radii, resolution=200.0, min_samples=10):
+    """
+    This function returns the fibonacci sphere coordinates for multiple layers
+    :param radii: array describing distances from the core in km, ordered from shallow to deep
+    :return layer index:
+    """
+    r_earth = 6371.0
+    num_layers = len(radii)
+    n_samples = int(((4 * radii[0] ** 2) / (resolution ** 2))) + 1
+    if n_samples < min_samples:
+        n_samples = min_samples
+    pts = np.array(fibonacci_sphere(n_samples))
+    all_layers = pts * radii[0]
+    print(np.shape(all_layers))
+
+    for rad in radii[1:-1]:
+        if rad == 0.0:
+            all_layers = np.append(all_layers, np.zeros((3,1)), axis=1)
+            continue
+        n_samples = int((4 * rad ** 2) / (resolution ** 2)) + 1
+        if n_samples < min_samples:
+            n_samples = min_samples
+
+        pts = np.array(fibonacci_sphere(n_samples))
+        layer = pts * rad
+        all_layers = np.append(all_layers, layer, axis=1)
+        print(np.shape(all_layers))
+
+
+
+
+
+    return all_layers
