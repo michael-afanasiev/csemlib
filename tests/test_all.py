@@ -397,7 +397,7 @@ def test_add_crust_and_s20rts_prem():
     write_vtk("crust_vsv.vtk", coords, elements, pts[:, 3], 'vsv')
 
 
-def topo_test():
+def test_topo():
     """
     Test to ensure that a vtk of the topography is written succesfully.
     :return:

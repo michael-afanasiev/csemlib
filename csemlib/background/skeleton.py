@@ -63,7 +63,7 @@ def multiple_fibonacci_resolution(radii, resolution=200.0, min_samples=10):
     pts = np.array(fibonacci_sphere(n_samples))
     all_layers = pts * radii[0]
 
-    for rad in radii[1:-1]:
+    for rad in radii[1:]:
         if rad == 0.0:
             all_layers = np.append(all_layers, np.zeros((3,1)), axis=1)
             continue

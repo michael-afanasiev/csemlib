@@ -72,15 +72,14 @@ class Topography(Model):
     def eval(self, x, y, z=0, param=None, topo_smooth_factor=0):
 
         # This is a heuristic.
-        #topo_smooth_factor = 1e5
+        #topo_smooth_factor = 1e2
 
         # Create smoother object.
         lut = interp.RectSphereBivariateSpline(self._data.coords['col'],
                                                self._data.coords['lon'],
                                                self._data[param],
-                                               s=topo_smooth_factor)
+                                               s=topo_smooth_factor, pole_values=[-4.228, -0.056])
 
         # Convert to coordinate system used for topography 0-2pi instead of -pi-pi
         y = y + np.pi
         return lut.ev(x, y)
-
