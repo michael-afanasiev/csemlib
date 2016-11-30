@@ -58,8 +58,6 @@ def multiple_fibonacci_resolution(radii, resolution=200.0, min_samples=10):
     :return all_layers: These are the x, y, z coordinates of all layers
     """
     n_samples = int(((4 * radii[0] ** 2) / (resolution ** 2))) + 1
-    if n_samples < min_samples:
-        n_samples = min_samples
     pts = np.array(fibonacci_sphere(n_samples))
     all_layers = pts * radii[0]
 

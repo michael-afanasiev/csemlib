@@ -76,28 +76,6 @@ class Crust(Model):
         lon[lon < 0] = 2 * np.pi + lon[lon < 0]
         return lut.ev(x, lon)
 
-    def eval_point_cloud(self, c, l, r, rho, vpv, vsv, vsh):
-
-        pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
-        r_earth = 6371.0
-        # Split into crustal and non crustal zone
-
-        cst_zone = pts[pts[:, 2] >= (r_earth - 100.0)]
-        non_cst_zone = pts[pts[:, 2] < (r_earth - 100.0)]
-
-        # Compute crustal depths and vs for crustal zone coordinates
-        self.read()
-        crust_dep = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1e1)
-        crust_vs = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=0)
-
-        # Currently crust is only added as vsv here
-        cst_zone[:, 5] = add_crust(cst_zone[:, 2], crust_dep, crust_vs, cst_zone[:, 5])
-
-        # Append crustal and non crustal zone back together
-        pts = np.append(cst_zone, non_cst_zone, axis=0)
-
-        return pts
-
 
     def eval_point_cloud_with_topo_all_params(self, c, l, r, rho, vpv, vsv, vsh):
 
@@ -132,7 +110,6 @@ class Crust(Model):
 
         return pts
 
-
 def add_crust(r, crust_dep, crust_vs, param):
     r_earth = 6371.0
     for i in range(len(r)):
@@ -142,17 +119,6 @@ def add_crust(r, crust_dep, crust_vs, param):
         else:
             continue
     return param
-
-
-def add_crust_all_params(r, crust_dep, crust_vs, rho, vpv, vsv, vsh):
-    r_earth = 6371.0
-    for i in range(len(r)):
-        if r[i] > (r_earth - crust_dep[i]):
-            # Do something with param here
-            vsv[i] = crust_vs[i]
-        else:
-            continue
-    return rho, vpv, vsv, vsh
 
 def add_crust_all_params_topo(r, crust_dep, crust_vs, topo, rho, vpv, vsv, vsh):
     r_earth = 6371.0
