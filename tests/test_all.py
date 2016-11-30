@@ -279,7 +279,7 @@ def test_s20rts_point_cloud():
     s20mod.read()
 
     # Generate point cloud
-    n_samples = 100
+    n_samples = 20
     n_layers = 10
     radii = np.linspace(s20mod.layers[0], s20mod.layers[-1], n_layers)
     x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
@@ -310,7 +310,7 @@ def test_s20rts_out_of_bounds():
 
 def test_add_crust_to_prem():
     # Generate point cloud
-    n_samples = 300
+    n_samples = 20
     n_layers = 10
     radii = np.linspace(6371.0, 0.0, n_layers)
     r_earth = 6371.0
@@ -347,7 +347,7 @@ def test_add_crust_to_prem():
 
 def test_vectorized_prem():
     # Generate point cloud
-    n_samples = 10
+    n_samples = 5
     n_layers = 100
     radii = np.linspace(6371.0, 0.0, n_layers)
 
@@ -368,7 +368,7 @@ def test_add_crust_and_s20rts_prem():
     """
 
     # Generate point cloud based on average distance to the next point
-    num_layers = 20
+    num_layers = 5
     radii = np.linspace(6371.0, 0.0, num_layers)
     r_earth = 6371.0
     res = r_earth / num_layers
