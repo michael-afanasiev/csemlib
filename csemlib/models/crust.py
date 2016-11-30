@@ -106,7 +106,3 @@ def add_crust(r, crust_dep, crust_vs, param):
         else:
             continue
     return param
-
-cst = Crust()
-cst.read()
-print(np.shape(cst._data['crust_vs']))
