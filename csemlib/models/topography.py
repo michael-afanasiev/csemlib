@@ -6,8 +6,6 @@ import xarray
 
 from .model import Model
 
-
-
 class Topography(Model):
     """
     Class handling topography models.
@@ -26,23 +24,22 @@ class Topography(Model):
 
     def read(self):
 
-        initial_reading = True
-
-        if initial_reading:
-            # Initial Reading
-            vals = np.genfromtxt(os.path.join(self.directory, '10MinuteTopoGrid.txt'), delimiter=',')
-            _, _, topo = vals.T
-
-            initial_lon = np.linspace(-180, 180, 360 * 6 + 1)
-            initial_col = np.linspace(-90, 90, 180 * 6 + 1)
-
-            topo = np.array(topo)
-            topo_reshaped = topo.reshape(len(initial_col), len(initial_lon))
-
-            # Resample such that there are no points at the poles
-            topo_resampled = topo_reshaped[1::2, 1::2]
-            topo_1d = topo_resampled.reshape(np.size(topo_resampled))
-            np.savetxt(os.path.join(self.directory, 'topo_resampled'), topo_1d, fmt='%.0f')
+        # initial_reading = False
+        # if initial_reading:
+        #     # Initial Reading
+        #     vals = np.genfromtxt(os.path.join(self.directory, '10MinuteTopoGrid.txt'), delimiter=',')
+        #     _, _, topo = vals.T
+        #
+        #     initial_lon = np.linspace(-180, 180, 360 * 6 + 1)
+        #     initial_col = np.linspace(-90, 90, 180 * 6 + 1)
+        #
+        #     topo = np.array(topo)
+        #     topo_reshaped = topo.reshape(len(initial_col), len(initial_lon))
+        #
+        #     # Resample such that there are no points at the poles
+        #     topo_resampled = topo_reshaped[1::2, 1::2]
+        #     topo_1d = topo_resampled.reshape(np.size(topo_resampled))
+        #     np.savetxt(os.path.join(self.directory, 'topo_resampled'), topo_1d, fmt='%.0f')
 
         val = np.genfromtxt(os.path.join(self.directory, 'topo_resampled'))
         # new sampling:

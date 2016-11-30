@@ -368,7 +368,7 @@ def test_add_crust_and_s20rts_prem():
     """
 
     # Generate point cloud based on average distance to the next point
-    num_layers = 5
+    num_layers = 10
     radii = np.linspace(6371.0, 0.0, num_layers)
     r_earth = 6371.0
     res = r_earth / num_layers
@@ -378,23 +378,22 @@ def test_add_crust_and_s20rts_prem():
 
     # Evaluate Prem
     rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
-    pts = np.array((c, l, r, vsv))
+    pts = np.array((c, l, r, rho, vpv, vsv, vsh))
 
     # Evaluate s20rts
     s20mod = s20.S20rts()
     pts = s20mod.eval_point_cloud_non_norm(*pts)
 
     cst = crust.Crust()
-    pts = cst.eval_point_cloud(*pts.T)
+    pts = cst.eval_point_cloud_with_topo_all_params(*pts.T)
 
     # Generate mesh for plotting (normalised coordinates)
     x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/ r_earth)
     elements = triangulate(x, y, z)
-
-    # Write to vtk
     coords = np.array((x, y, z)).T
 
-    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 3], 'vsv')
+    # Write to vtk
+    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 5], 'vsv')
 
 
 def test_topo():
@@ -414,3 +413,11 @@ def test_topo():
 
     pts = np.array((x, y, z)).T
     write_vtk("topo.vtk", pts, elements, vals, 'topo')
+
+    north_pole = np.array([-4.228])
+    south_pole = np.array([-0.056])
+    random_point = np.array([0.103])
+
+    np.testing.assert_almost_equal(topo.eval(0, 0, param='topo'), north_pole, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(topo.eval(np.pi, 0, param='topo'), south_pole, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(topo.eval(np.radians(90 - 53.833333), np.radians(76.500000), param='topo'), random_point, decimal=DECIMAL_CLOSE)

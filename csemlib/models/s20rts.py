@@ -134,26 +134,31 @@ class S20rts(Model):
 
 
 
-    def eval_point_cloud_non_norm(self, c, l, r, param):
+    def eval_point_cloud_non_norm(self, c, l, r, rho, vpv, vsv, vsh):
         """
         This returns the linearly interpolated perturbations of s20rts. Careful only points that fall inside
         of the domain of s20rts are returned.
         :param c: colatitude
         :param l: longitude
         :param r: distance from core in km
-        :param param: param to be returned - currently not used
-        :return c, l, r, vals
+        :param rho: param to be returned - currently not used
+        :param vpv: param to be returned - currently not used
+        :param vsv: param to be returned - currently not used
+        :param vsh: param to be returned - currently not used
+        :return c, l, r, rho, vpv, vsv, vsh
         """
 
         self.read()
-        pts = np.array((c, l, r, param)).T
+        pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
         s20rts_dmn, non_s20_dmn = self.split_domains(pts)
-
         # Initialize arrays to store evaluated points in the correct order
         c = np.zeros(0)
         l = np.zeros(0)
         r = np.zeros(0)
-        param = np.zeros(0)
+        rho = np.zeros(0)
+        vpv = np.zeros(0)
+        vsv = np.zeros(0)
+        vsh = np.zeros(0)
 
         # Only run when it exists
         if len(s20rts_dmn) > 0:
@@ -172,7 +177,7 @@ class S20rts(Model):
                 else:
                     chunk = chunk[chunk[:, 2] >= lower_rad - np.finfo(float).eps]
 
-                chunk_c, chunk_l, chunk_r, chunk_param = chunk.T
+                chunk_c, chunk_l, chunk_r, chunk_rho, chunk_vpv, chunk_vsv, chunk_vsh = chunk.T
 
                 # Evaluate S20RTS at upper and lower end of chunk, use these to interpolate
                 top_vals = self.eval(chunk_c, chunk_l, upper_rad, 'test')
@@ -181,14 +186,29 @@ class S20rts(Model):
                 # Interpolate
                 chunk_vals = self.linear_interpolation(bottom_vals, top_vals, lower_rad, upper_rad, chunk_r)
 
+                # Compute vp perturbations
+                R0 = 1.25
+                R2891 = 3.0
+                vp_slope = (R2891 - R0) / 2891.0
+                rDep = vp_slope * (self.r_earth - chunk_r) + R0
+                vp_val = chunk_vals / rDep
+
+                # Add perturbations
+                chunk_vpv *= (1 + vp_val)
+                chunk_vsv *= (1 + chunk_vals)
+                chunk_vsh *= (1 + chunk_vals)
+
                 # Store perturbed values
-                chunk_param *= (1 + chunk_vals)
-                param = np.append(param, chunk_param)
                 c = np.append(c, chunk_c)
                 r = np.append(r, chunk_r)
                 l = np.append(l, chunk_l)
+                rho = np.append(rho, chunk_rho)
+                vpv = np.append(vpv, chunk_vpv)
+                vsv = np.append(vsv, chunk_vsv)
+                vsh = np.append(vsh, chunk_vsh)
 
-        s20rts_dmn = np.array((c, l, r, param)).T
+        s20rts_dmn = np.array((c, l, r, rho, vpv, vsv, vsh)).T
+
         pts = np.append(s20rts_dmn, non_s20_dmn, axis=0)
 
         return pts
