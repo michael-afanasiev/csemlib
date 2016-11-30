@@ -12,6 +12,7 @@ import csemlib.models.one_dimensional as m1d
 import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
 from csemlib.models.model import triangulate, write_vtk
+from csemlib.models.topography import Topography
 from csemlib.utils import cart2sph, sph2cart
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
@@ -361,58 +362,55 @@ def test_vectorized_prem():
 
 
 def test_add_crust_and_s20rts_prem():
-    # Generate point cloud
-    n_samples = 300
-    n_layers = 10
-    radii = np.linspace(6371.0, 0.0, n_layers)
-    r_earth = 6371.0
+    """
+    Test where both s20rts and the crust are added to prem, this test does not include
+    topography yet.
+    """
 
-    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
+    # Generate point cloud based on average distance to the next point
+    num_layers = 20
+    radii = np.linspace(6371.0, 0.0, num_layers)
+    r_earth = 6371.0
+    res = r_earth / num_layers
+
+    x, y, z = skl.multiple_fibonacci_resolution(radii, resolution=res, min_samples=10)
     r, c, l = cart2sph(x, y, z)
 
     # Evaluate Prem
     rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
-
+    pts = np.array((c, l, r, vsv))
 
     # Evaluate s20rts
     s20mod = s20.S20rts()
-    s20mod.read()
+    pts = s20mod.eval_point_cloud_non_norm(*pts)
 
-    pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
-
-    s20rts_zone = pts[pts[:, 2] >= s20mod.layers[-1]]
-    s20rts_zone = pts[pts[:, 2] <= s20mod.layers[0]]
-
-    above_s20rts_zone = pts[pts[:, 2] > s20mod.layers[0]]
-    below_s20rts_zone = pts[pts[:, 2] < s20mod.layers[-1]]
-
-    non_s20rts_zone = np.append(above_s20rts_zone, below_s20rts_zone, axis=1)
-    s20rts_zone[:, 0], s20rts_zone[:, 1], s20rts_zone[:, 2], s20rts_zone[:, 5] = \
-        s20mod.eval_point_cloud(s20rts_zone[:, 0], s20rts_zone[:, 1],
-                                s20rts_zone[:, 2], s20rts_zone[:, 5])
-
-    pts = np.append(non_s20rts_zone, s20rts_zone, axis=1)
-
-    # Split into crustal and non crustal zone
-    pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
-    cst_zone = pts[pts[:, 2] >= (r_earth - 100.0)]
-    non_cst_zone = pts[pts[:, 2] < (r_earth - 100.0)]
-
-    # Compute crustal depths and vs for crustal zone coordinates
     cst = crust.Crust()
-    cst.read()
-    crust_dep = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1)
-    crust_vs = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=1)
+    pts = cst.eval_point_cloud(*pts.T)
 
-    cst_zone[:, 5] = crust.add_crust(cst_zone[:, 2], crust_dep, crust_vs, cst_zone[:, 5])
-
-    # Append crustal and non crustal zone back together
-    pts = np.append(cst_zone, non_cst_zone, axis=0)
-
-    # Generate mesh for plotting
-    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/6371.0)
+    # Generate mesh for plotting (normalised coordinates)
+    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/ r_earth)
     elements = triangulate(x, y, z)
 
     # Write to vtk
-    points = np.array((x, y, z)).T
-    write_vtk("crust_vs.vtk", points, elements, pts[:, 5], 'vs')
+    coords = np.array((x, y, z)).T
+
+    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 3], 'vsv')
+
+
+def topo_test():
+    """
+    Test to ensure that a vtk of the topography is written succesfully.
+    :return:
+
+    """
+    topo = Topography()
+    topo.read()
+
+    x, y, z = skl.fibonacci_sphere(10000)
+    _, c, l = cart2sph(x, y, z)
+
+    vals = topo.eval(c, l, param='topo')
+    elements = triangulate(x, y, z)
+
+    pts = np.array((x, y, z)).T
+    write_vtk("topo.vtk", pts, elements, vals, 'topo')

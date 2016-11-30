@@ -1,18 +1,16 @@
-import io
 import os
 
 import numpy as np
 import scipy.interpolate as interp
 import xarray
-from csemlib.background.skeleton import fibonacci_sphere
 
-from csemlib.models.model import Model, write_vtk, triangulate
-from csemlib.utils import cart2sph
+from .model import Model
+
 
 
 class Topography(Model):
     """
-    Class handling crustal models.
+    Class handling topography models.
     """
 
     def __init__(self):
@@ -42,8 +40,8 @@ class Topography(Model):
             topo_reshaped = topo.reshape(len(initial_col), len(initial_lon))
 
             # Resample such that there are no points at the poles
-            resampled = topo_reshaped[1::2, 1::2]
-            topo_1d = resampled.reshape(np.size(resampled))
+            topo_resampled = topo_reshaped[1::2, 1::2]
+            topo_1d = topo_resampled.reshape(np.size(topo_resampled))
             np.savetxt(os.path.join(self.directory, 'topo_resampled'), topo_1d, fmt='%.0f')
 
         val = np.genfromtxt(os.path.join(self.directory, 'topo_resampled'))
@@ -79,35 +77,10 @@ class Topography(Model):
         # Create smoother object.
         lut = interp.RectSphereBivariateSpline(self._data.coords['col'],
                                                self._data.coords['lon'],
-                                               self._data[param],s=topo_smooth_factor)
-
+                                               self._data[param],
+                                               s=topo_smooth_factor)
 
         # Convert to coordinate system used for topography 0-2pi instead of -pi-pi
         y = y + np.pi
         return lut.ev(x, y)
 
-
-def topo_test():
-    """
-    Test to ensure that a vtk of s20rts is written succesfully.
-    :return:
-
-
-    """
-    topo = Topography()
-    topo.read()
-
-    x, y, z = fibonacci_sphere(10000)
-    _, c, l = cart2sph(x, y, z)
-
-    vals = topo.eval(c, l, param='topo')
-
-    print(min(vals))
-    print(max(vals))
-    elements = triangulate(x, y, z)
-
-    pts = np.array((x, y, z)).T
-    write_vtk("topo.vtk", pts, elements, vals, 'topo')
-
-
-topo_test()

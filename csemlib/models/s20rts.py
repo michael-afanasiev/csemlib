@@ -4,10 +4,7 @@ import os
 import numpy as np
 from scipy.special import sph_harm
 
-from csemlib.background.skeleton import multiple_fibonacci_spheres
-from csemlib.models.model import Model, triangulate, write_vtk
-from csemlib.utils import cart2sph, sph2cart
-
+from.model import Model
 
 class S20rts(Model):
     """
@@ -148,6 +145,7 @@ class S20rts(Model):
         :return c, l, r, vals
         """
 
+        self.read()
         pts = np.array((c, l, r, param)).T
         s20rts_dmn, non_s20_dmn = self.split_domains(pts)
 
