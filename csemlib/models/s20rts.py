@@ -84,7 +84,7 @@ class S20rts(Model):
 
 
 
-    def eval_point_cloud_non_norm(self, c, l, r, rho, vpv, vsv, vsh):
+    def eval_point_cloud(self, c, l, r, rho, vpv, vsv, vsh):
         """
         This returns the linearly interpolated perturbations of s20rts. Careful only points that fall inside
         of the domain of s20rts are returned.

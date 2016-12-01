@@ -293,7 +293,7 @@ def test_add_crust_and_s20rts_prem():
 
     # Evaluate s20rts
     s20mod = s20.S20rts()
-    pts = s20mod.eval_point_cloud_non_norm(*pts)
+    pts = s20mod.eval_point_cloud(*pts)
 
     cst = crust.Crust()
     pts = cst.eval_point_cloud(*pts.T)
