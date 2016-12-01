@@ -56,6 +56,7 @@ class Ses3d(Model):
         self._data = []
         self.directory = directory
         self.components = components
+        self.was_read = False
         if doi:
             self.doi = doi
         else:
@@ -143,6 +144,8 @@ class Ses3d(Model):
             self._data[i].attrs['date'] = datetime.datetime.now().__str__()
             self._data[i].attrs['doi'] = self.doi
 
+        self.was_read = True
+
     def write(self, directory):
 
         for block, comp in zip(['block_x', 'block_y', 'block_z'], ['col', 'lon', 'rad']):
@@ -177,6 +180,9 @@ class Ses3d(Model):
         :param param: Param to interpolate.
         :return: Interpolated param at (x, y, z).
         """
+
+        if not self.was_read:
+            raise IOError("Please first call ses3d.read()")
 
         # Pack up the points.
         cols, lons, rads = np.meshgrid(

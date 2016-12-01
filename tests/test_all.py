@@ -172,6 +172,15 @@ def test_ses3d():
 
     np.testing.assert_almost_equal(true, interp, decimal=DECIMAL_CLOSE)
 
+def test_ses3d_noread():
+    """
+    Test to make sure ses3d fails if not read.
+    """
+    mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
+                    components=['drho', 'dvsv', 'dvsh', 'dvp'])
+    x, y, z = np.empty(()), np.empty(()), np.empty(())
+    with pytest.raises(IOError):
+        mod.eval(x, y, z, ['test'])
 
 def test_s20rts():
     """
@@ -426,12 +435,13 @@ def test_topo():
 def test_fail_ses3d():
     mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
                     components=['drho', 'dvsv', 'dvsh', 'dvp'])
+    mod.read()
 
     # Generate Fibonacci sphere at 20 km depth
     x, y, z = skl.fibonacci_sphere(10000)
-    x *= 6351.0
-    y *= 6351.0
-    z *= 6351.0
+    x *= 6251.0
+    y *= 6251.0
+    z *= 6251.0
 
     # Eval ses3d
     interp = mod.eval(x, y, z, param=['dvsv', 'drho', 'dvsh', 'dvp'])
@@ -439,4 +449,4 @@ def test_fail_ses3d():
     # Write to vtk
     elements = triangulate(x, y, z)
     pts = np.array((x, y, z)).T
-    write_vtk("ses3d.vtk", pts, elements, interp, 'ses3d')
+    write_vtk("ses3d.vtk", pts, elements, interp[:,0], 'ses3d')
