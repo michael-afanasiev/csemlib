@@ -421,3 +421,22 @@ def test_topo():
     np.testing.assert_almost_equal(topo.eval(0, 0, param='topo'), north_pole, decimal=DECIMAL_CLOSE)
     np.testing.assert_almost_equal(topo.eval(np.pi, 0, param='topo'), south_pole, decimal=DECIMAL_CLOSE)
     np.testing.assert_almost_equal(topo.eval(np.radians(90 - 53.833333), np.radians(76.500000), param='topo'), random_point, decimal=DECIMAL_CLOSE)
+
+
+def test_fail_ses3d():
+    mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
+                    components=['drho', 'dvsv', 'dvsh', 'dvp'])
+
+    # Generate Fibonacci sphere at 20 km depth
+    x, y, z = skl.fibonacci_sphere(10000)
+    x *= 6351.0
+    y *= 6351.0
+    z *= 6351.0
+
+    # Eval ses3d
+    interp = mod.eval(x, y, z, param=['dvsv', 'drho', 'dvsh', 'dvp'])
+
+    # Write to vtk
+    elements = triangulate(x, y, z)
+    pts = np.array((x, y, z)).T
+    write_vtk("ses3d.vtk", pts, elements, interp, 'ses3d')
