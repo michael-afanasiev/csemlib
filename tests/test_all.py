@@ -12,6 +12,7 @@ import csemlib.models.one_dimensional as m1d
 import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
 from csemlib.models.model import triangulate, write_vtk
+from csemlib.models.topography import Topography
 from csemlib.utils import cart2sph, sph2cart
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
@@ -278,7 +279,7 @@ def test_s20rts_point_cloud():
     s20mod.read()
 
     # Generate point cloud
-    n_samples = 100
+    n_samples = 20
     n_layers = 10
     radii = np.linspace(s20mod.layers[0], s20mod.layers[-1], n_layers)
     x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
@@ -309,7 +310,7 @@ def test_s20rts_out_of_bounds():
 
 def test_add_crust_to_prem():
     # Generate point cloud
-    n_samples = 300
+    n_samples = 20
     n_layers = 10
     radii = np.linspace(6371.0, 0.0, n_layers)
     r_earth = 6371.0
@@ -346,7 +347,7 @@ def test_add_crust_to_prem():
 
 def test_vectorized_prem():
     # Generate point cloud
-    n_samples = 10
+    n_samples = 5
     n_layers = 100
     radii = np.linspace(6371.0, 0.0, n_layers)
 
@@ -358,3 +359,65 @@ def test_vectorized_prem():
 
     with pytest.raises(ValueError):
         m1d.prem_eval_point_cloud([-1.0])
+
+
+def test_add_crust_and_s20rts_prem():
+    """
+    Test where both s20rts and the crust are added to prem, this test does not include
+    topography yet.
+    """
+
+    # Generate point cloud based on average distance to the next point
+    num_layers = 10
+    radii = np.linspace(6371.0, 0.0, num_layers)
+    r_earth = 6371.0
+    res = r_earth / num_layers
+
+    x, y, z = skl.multiple_fibonacci_resolution(radii, resolution=res, min_samples=10)
+    r, c, l = cart2sph(x, y, z)
+
+    # Evaluate Prem
+    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
+    pts = np.array((c, l, r, rho, vpv, vsv, vsh))
+
+    # Evaluate s20rts
+    s20mod = s20.S20rts()
+    pts = s20mod.eval_point_cloud_non_norm(*pts)
+
+    cst = crust.Crust()
+    pts = cst.eval_point_cloud_with_topo_all_params(*pts.T)
+
+    # Generate mesh for plotting (normalised coordinates)
+    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/ r_earth)
+    elements = triangulate(x, y, z)
+    coords = np.array((x, y, z)).T
+
+    # Write to vtk
+    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 5], 'vsv')
+
+
+def test_topo():
+    """
+    Test to ensure that a vtk of the topography is written succesfully.
+    :return:
+
+    """
+    topo = Topography()
+    topo.read()
+
+    x, y, z = skl.fibonacci_sphere(10000)
+    _, c, l = cart2sph(x, y, z)
+
+    vals = topo.eval(c, l, param='topo')
+    elements = triangulate(x, y, z)
+
+    pts = np.array((x, y, z)).T
+    write_vtk("topo.vtk", pts, elements, vals, 'topo')
+
+    north_pole = np.array([-4.228])
+    south_pole = np.array([-0.056])
+    random_point = np.array([0.103])
+
+    np.testing.assert_almost_equal(topo.eval(0, 0, param='topo'), north_pole, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(topo.eval(np.pi, 0, param='topo'), south_pole, decimal=DECIMAL_CLOSE)
+    np.testing.assert_almost_equal(topo.eval(np.radians(90 - 53.833333), np.radians(76.500000), param='topo'), random_point, decimal=DECIMAL_CLOSE)
