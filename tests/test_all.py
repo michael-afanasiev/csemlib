@@ -438,10 +438,10 @@ def test_fail_ses3d():
     mod.read()
 
     # Generate Fibonacci sphere at 20 km depth
-    x, y, z = skl.fibonacci_sphere(10000)
-    x *= 6251.0
-    y *= 6251.0
-    z *= 6251.0
+    x, y, z = skl.fibonacci_sphere(100000)
+    x *= 6250.0
+    y *= 6250.0
+    z *= 6250.0
 
     # Eval ses3d
     interp = mod.eval(x, y, z, param=['dvsv', 'drho', 'dvsh', 'dvp'])
