@@ -77,7 +77,7 @@ class Crust(Model):
         return lut.ev(x, lon)
 
 
-    def eval_point_cloud_with_topo_all_params(self, c, l, r, rho, vpv, vsv, vsh):
+    def eval_point_cloud(self, c, l, r, rho, vpv, vsv, vsh):
 
         pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
         r_earth = 6371.0
@@ -93,7 +93,7 @@ class Crust(Model):
         crust_dep = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1e1)
         crust_vs = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=0)
 
-        #Get Topography
+        # Get Topography
         top = Topography()
         top.read()
         topo = top.eval(cst_zone[:, 0], cst_zone[:, 1], param='topo')
@@ -109,16 +109,6 @@ class Crust(Model):
         pts = np.append(cst_zone, non_cst_zone, axis=0)
 
         return pts
-
-def add_crust(r, crust_dep, crust_vs, param):
-    r_earth = 6371.0
-    for i in range(len(r)):
-        if r[i] > (r_earth - crust_dep[i]):
-            # Do something with param here
-            param[i] = crust_vs[i]
-        else:
-            continue
-    return param
 
 def add_crust_all_params_topo(r, crust_dep, crust_vs, topo, rho, vpv, vsv, vsh):
     r_earth = 6371.0

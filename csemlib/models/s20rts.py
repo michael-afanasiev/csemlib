@@ -69,62 +69,12 @@ class S20rts(Model):
 
         return vals
 
-    def eval_point_cloud(self, c, l, r, param):
-        """
-        This returns the linearly interpolated perturbations of s20rts. Careful only points that fall inside
-        of the domain of s20rts are returned.
-        :param c: colatitude
-        :param l: longitude
-        :param r: normalised distance from core in km
-        :param param: param to be returned - currently not used
-        :return c, l, r, vals
-        """
-        pts = np.array((c, l, r)).T
-        s20_lay_norm = self.layers / self.r_earth
-
-        # Sorted array, probably not necessary anymore
-        pts_sorted = np.asarray(sorted(pts, key=lambda pts_entry: pts_entry[2], reverse=True))
-        # Initialize arrays to store evaluated points in the correct order
-        vals = np.zeros(0)
-        c = np.zeros(0)
-        l = np.zeros(0)
-        r = np.zeros(0)
-
-        for i in range(len(self.layers) - 1):
-            upper_rad_norm = s20_lay_norm[i]
-            lower_rad_norm = s20_lay_norm[i+1]
-            upper_rad = self.layers[i]
-            lower_rad = self.layers[i+1]
-
-            # Extract chunk for interpolation
-            # Discard everything above chunk
-            if i == 0:
-                chunk = pts_sorted[pts_sorted[:, 2] <= upper_rad_norm + np.finfo(float).eps]
-            else:
-                chunk = pts_sorted[pts_sorted[:, 2] <= upper_rad_norm]
-
-            # Discard everything below chunk
-            if i < len(self.layers) - 2:
-                chunk = chunk[chunk[:, 2] > lower_rad_norm]
-            else:
-                chunk = chunk[chunk[:, 2] >= lower_rad_norm - np.finfo(float).eps]
-
-            chunk_c, chunk_l, chunk_r = chunk.T
-
-            # Evaluate S20RTS at upper and lower end of chunk, use these to interpolate
-            top_vals = self.eval(chunk_c, chunk_l, upper_rad, 'test')
-            bottom_vals = self.eval(chunk_c, chunk_l, lower_rad, 'test')
-
-            chunk_vals = self.linear_interpolation(bottom_vals, top_vals, lower_rad_norm, upper_rad_norm, chunk_r)
-            vals = np.append(vals, chunk_vals)
-            c = np.append(c, chunk_c)
-            r = np.append(r, chunk_r)
-            l = np.append(l, chunk_l)
-
-        return c, l, r, vals
-
     def split_domains(self, pts):
-        # Split array in two zones
+        """
+        This splits an array of pts of all values into a
+        :param pts:
+        :return:
+        """
         s20rts_dmn = pts[pts[:, 2] <= self.layers[0]]
         s20rts_dmn = s20rts_dmn[s20rts_dmn[:, 2] >= self.layers[-1]]
         above_dmn = pts[pts[:, 2] > self.layers[0]]
@@ -134,7 +84,7 @@ class S20rts(Model):
 
 
 
-    def eval_point_cloud_non_norm(self, c, l, r, rho, vpv, vsv, vsh):
+    def eval_point_cloud(self, c, l, r, rho, vpv, vsv, vsh):
         """
         This returns the linearly interpolated perturbations of s20rts. Careful only points that fall inside
         of the domain of s20rts are returned.

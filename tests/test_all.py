@@ -217,9 +217,8 @@ def test_s20rts():
 
 def test_s20rts_vtk_single_sphere():
     """
-    Test to ensure that a vtk of s20rts is written succesfully.
+    Test to ensure that a vtk of a single sphere of s20rts is written succesfully.
     :return:
-
 
     """
     s20mod = s20.S20rts()
@@ -236,65 +235,6 @@ def test_s20rts_vtk_single_sphere():
     pts = np.array((x, y, z)).T * rel_rad
     write_vtk("test_s20rts.vtk", pts, elements, vals, 'vs')
 
-
-def test_3d_s20rts_vtk():
-    """
-    Test to ensure that a vtk of s20rts is written succesfully.
-    :return:
-
-    """
-    s20mod = s20.S20rts()
-    s20mod.read()
-
-    radii = [6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79, 5872.18, 5774.69, 5667.44, 5549.46,
-              5419.68,5276.89, 5119.82, 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96]
-
-    n_samples = 1000
-    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
-    r, c, l = cart2sph(x, y, z)
-
-    c = c[0:n_samples]
-    l = l[0:n_samples]
-
-    # all c and r are the same if the spheres are created with equal amounts of points
-    vals = s20mod.eval(c,l,radii[0], 'test')
-
-    for i in range(len(radii))[1:]:
-        new_vals = s20mod.eval(c,l, radii[i], 'test')
-        vals = np.append(vals, new_vals)
-
-    elements = triangulate(x,y,z)
-    pts = np.array((x, y, z)).T
-    write_vtk("test_3d_s20rts.vtk", pts, elements, vals, 'vs')
-
-
-def test_s20rts_point_cloud():
-    """
-    Test to ensure that a vtk of s20rts is written succesfully.
-    :return:
-
-    """
-    # Initialize s20rts
-    s20mod = s20.S20rts()
-    s20mod.read()
-
-    # Generate point cloud
-    n_samples = 20
-    n_layers = 10
-    radii = np.linspace(s20mod.layers[0], s20mod.layers[-1], n_layers)
-    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples)
-    r, c, l = cart2sph(x, y, z)
-
-    # Evaluate points
-    c, l, r, vals = s20mod.eval_point_cloud(c, l, r, 'test')
-
-    # Generate coordinates and mesh connectivity
-    x, y, z = sph2cart(c, l, r)
-    elements = triangulate(x,y,z)
-
-    # Write to vtk
-    pts = np.array((x, y, z)).T
-    write_vtk("test_3d_s20rts.vtk", pts, elements, vals, 'vs')
 
 def test_s20rts_out_of_bounds():
     mod = s20.S20rts()
@@ -313,58 +253,29 @@ def test_add_crust_to_prem():
     n_samples = 20
     n_layers = 10
     radii = np.linspace(6371.0, 0.0, n_layers)
-    r_earth = 6371.0
 
     x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
     r, c, l = cart2sph(x, y, z)
 
     # Evaluate Prem
     rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
+    pts = np.array((c, l, r, rho, vpv, vsv, vsh))
 
-    # Split into crustal and non crustal zone
-    pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
-    cst_zone = pts[pts[:, 2] >= (r_earth - 100.0)]
-    non_cst_zone = pts[pts[:, 2] < (r_earth - 100.0)]
-
-    # Compute crustal depths and vs for crustal zone coordinates
+    # Evaluate crust
     cst = crust.Crust()
-    cst.read()
-    crust_dep = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1)
-    crust_vs = cst.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=1)
-
-    cst_zone[:, 5] = crust.add_crust(cst_zone[:, 2], crust_dep, crust_vs, cst_zone[:, 5])
-
-    # Append crustal and non crustal zone back together
-    pts = np.append(cst_zone, non_cst_zone, axis=0)
+    pts = cst.eval_point_cloud(*pts)
 
     # Generate mesh for plotting
     x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/6371.0)
     elements = triangulate(x, y, z)
 
     # Write to vtk
-    points = np.array((x, y, z)).T
-    write_vtk("crust_vs.vtk", points, elements, pts[:, 5], 'vs')
-
-def test_vectorized_prem():
-    # Generate point cloud
-    n_samples = 5
-    n_layers = 100
-    radii = np.linspace(6371.0, 0.0, n_layers)
-
-
-    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
-    r, c, l = cart2sph(x, y, z)
-
-    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
-
-    with pytest.raises(ValueError):
-        m1d.prem_eval_point_cloud([-1.0])
-
+    coords = np.array((x, y, z)).T
+    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 5], 'vsv')
 
 def test_add_crust_and_s20rts_prem():
     """
-    Test where both s20rts and the crust are added to prem, this test does not include
-    topography yet.
+    Test where both s20rts and the crust with topography are added to prem.
     """
 
     # Generate point cloud based on average distance to the next point
@@ -382,10 +293,10 @@ def test_add_crust_and_s20rts_prem():
 
     # Evaluate s20rts
     s20mod = s20.S20rts()
-    pts = s20mod.eval_point_cloud_non_norm(*pts)
+    pts = s20mod.eval_point_cloud(*pts)
 
     cst = crust.Crust()
-    pts = cst.eval_point_cloud_with_topo_all_params(*pts.T)
+    pts = cst.eval_point_cloud(*pts.T)
 
     # Generate mesh for plotting (normalised coordinates)
     x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/ r_earth)
@@ -394,7 +305,6 @@ def test_add_crust_and_s20rts_prem():
 
     # Write to vtk
     write_vtk("crust_vsv.vtk", coords, elements, pts[:, 5], 'vsv')
-
 
 def test_topo():
     """
