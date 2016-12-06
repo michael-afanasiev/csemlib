@@ -1,6 +1,8 @@
 import math
 
 import numpy as np
+from csemlib.models.model import triangulate, write_vtk
+from csemlib.utils import cart2sph
 
 
 def fibonacci_sphere(n_samples):
@@ -81,3 +83,93 @@ def multiple_fibonacci_resolution(radii, resolution=200.0, min_samples=10):
 
 
     return all_layers
+
+
+
+def fibonacci_sphere_14_vec(n_samples):
+
+
+    # Define Refinement region
+    c_max = np.radians(40)
+    c_min = np.radians(70)
+    z_start = math.cos(c_max)
+    z_end = math.cos(c_min)
+    z_len = z_end - z_start
+
+    l_min = np.radians(125)
+    l_max = np.radians(155)
+    part_of_circle = (l_max - l_min) / (2 * math.pi)
+
+    golden_angle = math.pi * (3.0 - math.sqrt(5.0)) * part_of_circle
+
+
+    def populate(idx):
+        offset = z_len / n_samples
+        z = ((idx * offset) + z_start) + (offset / 2.0)
+        r = math.sqrt(1 - z ** 2)
+        phi = (idx * golden_angle) % (part_of_circle * 2 * math.pi) + l_min
+        x = math.cos(phi) * r
+        y = math.sin(phi) * r
+
+        return x, y, z
+
+    g = np.vectorize(populate)
+    return np.fromfunction(g, (n_samples,))
+
+
+def get_multiple_layers(x, y, z, radii):
+    r_earth = 6371.0
+    all_x = np.zeros(0)
+    all_y = np.zeros(0)
+    all_z = np.zeros(0)
+
+    for rad in radii:
+        if rad == 0:
+            all_x = np.append(all_x, np.zeros(1))
+            all_y = np.append(all_y, np.zeros(1))
+            all_z = np.append(all_z, np.zeros(1))
+            continue
+
+        rel_rad = rad / r_earth
+        new_x = x * rel_rad
+        new_y = y * rel_rad
+        new_z = z * rel_rad
+
+        all_x = np.append(all_x, new_x)
+        all_y = np.append(all_y, new_y)
+        all_z = np.append(all_z, new_z)
+    return all_x, all_y, all_z
+
+def s20rts_vtk_single_sphere():
+    """
+    Test to ensure that a vtk of s20rts is written succesfully.
+    :return:
+
+
+    """
+
+    x_g, y_g, z_g = fibonacci_sphere(100)
+    global_radii = np.linspace(0, 6371.0, 5)
+    x_g, y_g, z_g = get_multiple_layers(x_g, y_g, z_g, global_radii)
+    x, y, z = fibonacci_sphere_14_vec(100)
+    radii = np.linspace(5500.0, 6371.0, 10)
+    x, y, z = get_multiple_layers(x, y, z, radii)
+    x = np.append(x, x_g)
+    y = np.append(y, y_g)
+    z = np.append(z, z_g)
+
+
+    # x = x_g
+    # y = y_g
+    # z = z_g
+
+
+    vals = np.ones_like(x)
+
+    elements = triangulate(x,y,z)
+
+    pts = np.array((x, y, z)).T
+
+    write_vtk("test_vec.vtk", pts, elements, vals, 'vs')
+
+s20rts_vtk_single_sphere()
