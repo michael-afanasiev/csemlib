@@ -15,6 +15,7 @@ class FibonacciGrid:
         self._y = np.zeros(0)
         self._z = np.zeros(0)
         self.r_earth = 6371.0
+        self.has_zero_point = False
 
     def set_global_sphere(self, radii, resolution):
         """
@@ -24,11 +25,15 @@ class FibonacciGrid:
         :return:
         """
         for i in range(len(radii)):
-            if radii[i] == 0:
-                self._x = np.append(self._x, np.zeros(1))
-                self._y = np.append(self._y, np.zeros(1))
-                self._z = np.append(self._z, np.zeros(1))
-                continue
+            if radii[i] <= np.finfo(float).eps:
+                if self.has_zero_point:
+                    continue
+                else:
+                    self.has_zero_point = True
+                    self._x = np.append(self._x, np.zeros(1))
+                    self._y = np.append(self._y, np.zeros(1))
+                    self._z = np.append(self._z, np.zeros(1))
+                    continue
 
             surf_area_sphere = (4 * np.pi * radii[i] ** 2)
             n_samples = int(surf_area_sphere / (resolution[i] ** 2)) + 1
@@ -51,14 +56,18 @@ class FibonacciGrid:
         :return:
         """
 
-        self.discard_region(c_min, c_max, l_min, l_max, np.min(radii), np.max(radii))
+        #self.discard_region(c_min, c_max, l_min, l_max, np.min(radii), np.max(radii))
 
         for i in range(len(radii)):
-            if radii[i] == 0:
-                self._x = np.append(self._x, np.zeros(1))
-                self._y = np.append(self._y, np.zeros(1))
-                self._z = np.append(self._z, np.zeros(1))
-                continue
+            if radii[i] <= np.finfo(float).eps:
+                if self.has_zero_point:
+                    continue
+                else:
+                    self.has_zero_point = True
+                    self._x = np.append(self._x, np.zeros(1))
+                    self._y = np.append(self._y, np.zeros(1))
+                    self._z = np.append(self._z, np.zeros(1))
+                    continue
 
             surf_area_region = (4 * np.pi * radii[i] ** 2) * (c_max - c_min) * (l_max - l_min) / (2 * np.pi * np.pi)
             n_samples = int(surf_area_region / (resolution[i] ** 2)) + 1

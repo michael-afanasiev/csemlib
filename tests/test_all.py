@@ -16,6 +16,7 @@ from csemlib.models.topography import Topography
 from csemlib.utils import cart2sph, sph2cart
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
+VTK_DIR = os.path.join(os.path.split(__file__)[0], 'vtk')
 DECIMAL_CLOSE = 3
 
 
@@ -233,7 +234,7 @@ def test_s20rts_vtk_single_sphere():
     elements = triangulate(x,y,z)
 
     pts = np.array((x, y, z)).T * rel_rad
-    write_vtk("test_s20rts.vtk", pts, elements, vals, 'vs')
+    write_vtk(os.path.join(VTK_DIR, 'test_s20rts.vtk'), pts, elements, vals, 'vs')
 
 
 def test_s20rts_out_of_bounds():
@@ -271,7 +272,7 @@ def test_add_crust_to_prem():
 
     # Write to vtk
     coords = np.array((x, y, z)).T
-    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 5], 'vsv')
+    write_vtk(os.path.join(VTK_DIR, 'crust_vsv.vtk'), coords, elements, pts[:, 5], 'vsv')
 
 def test_add_crust_and_s20rts_prem():
     """
@@ -304,7 +305,7 @@ def test_add_crust_and_s20rts_prem():
     coords = np.array((x, y, z)).T
 
     # Write to vtk
-    write_vtk("crust_vsv.vtk", coords, elements, pts[:, 5], 'vsv')
+    write_vtk(os.path.join(VTK_DIR, 'crust_vsv.vtk'), coords, elements, pts[:, 5], 'vsv')
 
 def test_topo():
     """
@@ -322,7 +323,7 @@ def test_topo():
     elements = triangulate(x, y, z)
 
     pts = np.array((x, y, z)).T
-    write_vtk("topo.vtk", pts, elements, vals, 'topo')
+    write_vtk(os.path.join(VTK_DIR, 'topo.vtk'), pts, elements, vals, 'topo')
 
     north_pole = np.array([-4.228])
     south_pole = np.array([-0.056])
