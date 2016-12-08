@@ -4,9 +4,10 @@ import os
 
 from csemlib.background.fibonacci_grid import FibonacciGrid
 from csemlib.models.model import triangulate, write_vtk
+import boltons.fileutils
 
 VTK_DIR = os.path.join(os.path.split(__file__)[0], 'vtk')
-os.mkdir(VTK_DIR)
+boltons.fileutils.mkdir_p(VTK_DIR)
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 DECIMAL_CLOSE = 3
 

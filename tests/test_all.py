@@ -14,10 +14,11 @@ import csemlib.models.ses3d as s3d
 from csemlib.models.model import triangulate, write_vtk
 from csemlib.models.topography import Topography
 from csemlib.utils import cart2sph, sph2cart
+import boltons.fileutils
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 VTK_DIR = os.path.join(os.path.split(__file__)[0], 'vtk')
-os.mkdir(VTK_DIR)
+boltons.fileutils.mkdir_p(VTK_DIR)
 DECIMAL_CLOSE = 3
 
 
