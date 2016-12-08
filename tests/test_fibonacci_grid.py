@@ -6,6 +6,7 @@ from csemlib.background.fibonacci_grid import FibonacciGrid
 from csemlib.models.model import triangulate, write_vtk
 
 VTK_DIR = os.path.join(os.path.split(__file__)[0], 'vtk')
+os.mkdir(VTK_DIR)
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 DECIMAL_CLOSE = 3
 
@@ -49,7 +50,6 @@ def test_fibonacci_grid():
     elements = triangulate(x, y, z)
 
     pts = np.array((x, y, z)).T
-
     true = np.genfromtxt(os.path.join(TEST_DATA_DIR, 'fibonacci_points.txt'))
     np.testing.assert_almost_equal(pts, true, decimal=DECIMAL_CLOSE)
     write_vtk(os.path.join(VTK_DIR, 'test_fib_grid.vtk'), pts, elements, vals, 'ones')

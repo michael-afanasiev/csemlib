@@ -17,6 +17,7 @@ from csemlib.utils import cart2sph, sph2cart
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 VTK_DIR = os.path.join(os.path.split(__file__)[0], 'vtk')
+os.mkdir(VTK_DIR)
 DECIMAL_CLOSE = 3
 
 
