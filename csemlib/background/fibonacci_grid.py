@@ -56,7 +56,7 @@ class FibonacciGrid:
         :return:
         """
 
-        #self.discard_region(c_min, c_max, l_min, l_max, np.min(radii), np.max(radii))
+        self.discard_region(c_min, c_max, l_min, l_max, np.min(radii), np.max(radii))
 
         for i in range(len(radii)):
             if radii[i] <= np.finfo(float).eps:
