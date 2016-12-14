@@ -5,6 +5,7 @@ import os
 import numpy as np
 import xarray
 
+
 from csemlib.background.fibonacci_grid import FibonacciGrid
 from csemlib.models.model import Model, shade, triangulate, interpolate, write_vtk
 from csemlib.utils import sph2cart, rotate, cart2sph
@@ -207,9 +208,28 @@ class Ses3d(Model):
         return np.array(interp_param).T
 
 
+def in_hull(p, hull):
+    """
+    Test if points in `p` are in `hull`
+
+    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
+    `hull` is either a scipy.spatial.Delaunay object or the `MxK` array of the
+    coordinates of `M` points in `K`dimensions for which Delaunay triangulation
+    will be computed
+    """
+
+    from scipy.spatial import Delaunay
+    if not isinstance(hull,Delaunay):
+        hull = Delaunay(hull)
+    return hull
+    #return hull.find_simplex(p)>=0
+
+
 import numpy as np
+import _pickle as pickle
 import scipy.spatial as spatial
 from scipy.interpolate import Rbf
+from scipy.spatial.qhull import ConvexHull
 from scipy.interpolate import griddata
 
 # Get original data (this seems to work fine)
@@ -224,12 +244,14 @@ z = mod.data['z'].values.ravel()
 
 r, _, l = cart2sph(x, y, z)
 pts_original = np.array((x, y, z)).T
-# data = np.array(d)
-data = np.degrees(l)
-# Generate visualisation grid
+data = np.array(d)
+#data = np.degrees(l)
+
+
+#  Generate visualisation grid
 fib_grid = FibonacciGrid()
 # Set global background grid
-radii = np.linspace(6350.0, 0.0, 3)
+radii = np.linspace(6250.0, 0.0, 3)
 resolution = np.ones_like(radii) * (6350.0 / 10)
 fib_grid.set_global_sphere(radii, resolution)
 # refinement region coarse
@@ -237,108 +259,110 @@ c_min = np.radians(10)
 c_max = np.radians(90)
 l_min = np.radians(80)
 l_max = np.radians(170)
-radii_regional = np.linspace(6350.0, 5950.0, 3)
-resolution_regional = np.ones_like(radii_regional) * 150
+radii_regional = np.linspace(6250.0, 6150.0, 4)
+resolution_regional = np.ones_like(radii_regional) * 50
 fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
 x, y, z = fib_grid.get_coordinates()
 pts_new = np.array((x, y, z)).T
 
 
+
+hull = ConvexHull(pts_original)
+pts_hull = []
+for point in np.unique(hull.simplices.flatten()):
+    pts_hull.append(pts_original[point])
+pts_hull = np.array(pts_hull)
+
+# Generate convex hull of original points and only continue with points that fall inside
+hull = spatial.Delaunay(pts_hull)
+
+# Split points into points that fall inside and outside of convex hull
+in_or_out = hull.find_simplex(pts_new)>=0
+indices_in = np.where(in_or_out == True)
+indices_out = np.where(in_or_out == False)
+pts_other = pts_new[indices_out]
+pts_new = pts_new[indices_in]
+
 # Generate KDTrees
 pnt_tree_orig = spatial.cKDTree(pts_original)
-pnt_tree_new = spatial.cKDTree(pts_new)
 
-r = 150.0
-all_pairs = pnt_tree_new.query_ball_tree(pnt_tree_orig, r)
 
-print(np.max(x))
+# pnt_tree_new = spatial.cKDTree(pts_new)
+#
+# r = 50
+# all_pairs = pnt_tree_new.query_ball_tree(pnt_tree_orig, r)
+#
+# i = 0
+# max_pair = 0
+# dat_new = np.zeros(np.shape(pts_new)[0])
+# for pairs in all_pairs:
+#     if len(pairs) < 3:
+#         i += 1
+#         continue
+#     if len(pairs) > max_pair:
+#         max_pair = len(pairs)
+#
+#     # Original coords and data
+#     x_c_orig, y_c_orig, z_c_orig = pnt_tree_orig.data[pairs].T
+#     dat_orig = data[pairs]
+#
+#     rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig)
+#
+#     # New coords and data
+#     pts_local = np.array((x_c_orig, y_c_orig, z_c_orig)).T
+#     x_c_new, y_c_new, z_c_new = pnt_tree_new.data[i]
+#     #print x_c_new, y_c_new
+#
+#     xi = np.array((x_c_new, y_c_new, z_c_new))
+#
+#     #dat_new[i] = griddata(pts_local, dat_orig, xi, method='nearest', fill_value=-5.0)
+#     dat_new[i] = rbfi(x_c_new, y_c_new, z_c_new)
+#     i += 1
+#     if i % 100 == 0:
+#         print(len(pairs))
+#         print(i)
+
+
+# Method based on nearest points:
+
+_, pairs = pnt_tree_orig.query(pts_new, k=10)
+
 i = 0
-max_pair = 0
 dat_new = np.zeros(np.shape(pts_new)[0])
-for pairs in all_pairs:
-    if len(pairs) < 3:
-        i += 1
-        continue
-    if len(pairs) > max_pair:
-        max_pair = len(pairs)
-
-    # Original coords and data
-    x_c_orig, y_c_orig, z_c_orig = pnt_tree_orig.data[pairs].T
-    dat_orig = data[pairs]
+for idx in pairs:
+    x_c_orig, y_c_orig, z_c_orig = pts_original[idx].T
+    dat_orig = data[idx]
 
     rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig)
-
-    # New coords and data
-    pts_local = np.array((x_c_orig, y_c_orig, z_c_orig)).T
-    x_c_new, y_c_new, z_c_new = pnt_tree_new.data[i]
-    #print x_c_new, y_c_new
-
-    xi = np.array((x_c_new, y_c_new, z_c_new))
-
-    #dat_new[i] = griddata(pts_local, dat_orig, xi, method='nearest', fill_value=0.0)
+    x_c_new, y_c_new, z_c_new = pts_new[i]
     dat_new[i] = rbfi(x_c_new, y_c_new, z_c_new)
+
     i += 1
+
     if i % 100 == 0:
+        print(len(pairs))
         print(i)
-#
-# print(np.sum(dat_new))
 
 
-# d = mod.data['dvsv'].values.ravel()
-# x = mod.data['x'].values.ravel()
-# y = mod.data['y'].values.ravel()
-# z = mod.data['z'].values.ravel()
-#
-x, y, z = fib_grid.get_coordinates(is_normalised=False)
+
+pts_all = np.append(pts_new, pts_other, axis=0)
+dat_all = np.append(dat_new, np.zeros_like(pts_other[:,0]))
+
+# Write to vtk
+x, y, z = pts_all.T
 elements = triangulate(x, y, z)
-
-pts = np.array((x, y, z)).T
-write_vtk("ses3d_kd_tree.vtk", pts, elements, dat_new, 'dvsv')
+write_vtk(os.path.join('ses_check.vtk'), pts_all, elements, dat_all, 'ses3d')
 
 
 
-from scipy.interpolate import griddata
 
-#vals = griddata(pts_original, data, pts, fill_value=-1.0, method='nearest')
-# from scipy.interpolate import Rbf
-#
-# kwargs = {'function': 'multiquadric'}
-#
-# args = [pts_original[:, 0], pts_original[:, 1], pts_original[:, 2], data]
-# print(len(args))
-# def some_function(*args, **kwargs):
-#     xi = np.asarray([np.asarray(a, dtype=np.float_).flatten()
-#                             for a in args[:-1]])
-#
-#     print(len(args))
-#
-#
-#
-#     xi = np.asarray([np.asarray(a, dtype=np.float_).flatten()
-#                            for a in args[:-1]])
-#     print(xi)
-#
-#     N = xi.shape[-1]
-#     di = np.asarray(args[-1]).flatten()
-#     r = call_norm(xi, xi)
-#     print(r.shape)
-#
-#
-# def call_norm( x1, x2):
-#     print(len(x1.shape))
-#
-#     if len(x1.shape) == 1:
-#         x1 = x1[np.newaxis, :]
-#     if len(x2.shape) == 1:
-#         x2 = x2[np.newaxis, :]
-#     x1 = x1[..., :, np.newaxis]
-#     x2 = x2[..., np.newaxis, :]
-#     print(x1.shape)
-#     print(x2.shape)
-#     x1 - x2
-#     return np.sqrt(((x1 - x2)**2).sum(axis=0))
-#
-# some_function(*args)
-# rbfi = Rbf(*args, **kwargs)  # radial basis function interpolator instance
 
+
+
+# x, y, z = pts_all.T
+# #dat_hull = np.ones_like(x)
+# elements = triangulate(x, y, z)
+# #print(np.shape(pts_hull))
 #
+# pts = np.array((x, y, z)).T
+# write_vtk("ses3d_kd_tree.vtk", pts_all, elements, dat_all, 'hull')
