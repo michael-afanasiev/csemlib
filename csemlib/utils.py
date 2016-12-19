@@ -40,7 +40,7 @@ def cart2sph(x, y, z):
 
     c = np.arccos(c)
     l = np.arctan2(y, x)
-    return r, c, l
+    return c, l, r
 
 
 def rotate(x, y, z, matrix):

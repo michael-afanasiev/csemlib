@@ -70,10 +70,10 @@ class Ses3d_rbf(Ses3d):
 
         return model_coords, model_data
 
-    def eval_point_cloud(self,c, l, r, rho, vpv, vsv, vsh):
+    def eval_point_cloud(self,c, l, r, rho, vpv, vsv, vsh, GridData):
         model_coords, model_data = self.get_data_pts_model()
-        dat_old = np.array(rho, vpv, vsv, vsh)
-        x, y, z = sph2cart(c, l, r)
+
+        x, y, z = GridData.get_coordinates()
         pts_new = np.array((x, y, z)).T
 
         pts_original = model_coords
@@ -98,8 +98,7 @@ class Ses3d_rbf(Ses3d):
             dat_new[i] = rbfi(x_c_new, y_c_new, z_c_new)
 
             i += 1
-            if i % 200 == 0:
-                print(i)
+
 
         pts_all = np.append(pts_new, pts_other, axis=0)
         dat_all = np.append(dat_new, np.zeros_like(pts_other[:,0]))
@@ -138,7 +137,7 @@ x = mod.data['x'].values.ravel()
 y = mod.data['y'].values.ravel()
 z = mod.data['z'].values.ravel()
 
-r, _, l = cart2sph(x, y, z)
+_, l, r = cart2sph(x, y, z)
 pts_original = np.array((x, y, z)).T
 data = np.array(d)
 #data = np.degrees(l)

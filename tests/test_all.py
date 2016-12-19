@@ -230,7 +230,7 @@ def test_s20rts_vtk_single_sphere():
     rad = s20mod.layers[0]
     rel_rad = rad/ s20mod.r_earth
     x, y, z = skl.fibonacci_sphere(500)
-    _, c, l = cart2sph(x, y, z)
+    c, l, _ = cart2sph(x, y, z)
     vals = s20mod.eval(c, l, rad, 'test')
 
     elements = triangulate(x,y,z)
@@ -258,7 +258,7 @@ def test_add_crust_to_prem():
     radii = np.linspace(6371.0, 0.0, n_layers)
 
     x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
-    r, c, l = cart2sph(x, y, z)
+    c, l, r = cart2sph(x, y, z)
 
     # Evaluate Prem
     rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
@@ -288,7 +288,7 @@ def test_add_crust_and_s20rts_prem():
     res = r_earth / num_layers
 
     x, y, z = skl.multiple_fibonacci_resolution(radii, resolution=res, min_samples=10)
-    r, c, l = cart2sph(x, y, z)
+    c, l, r = cart2sph(x, y, z)
 
     # Evaluate Prem
     rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
@@ -319,7 +319,7 @@ def test_topo():
     topo.read()
 
     x, y, z = skl.fibonacci_sphere(10000)
-    _, c, l = cart2sph(x, y, z)
+    c, l, _ = cart2sph(x, y, z)
 
     vals = topo.eval(c, l, param='topo')
     elements = triangulate(x, y, z)

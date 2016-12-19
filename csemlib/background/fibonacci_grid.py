@@ -89,7 +89,7 @@ class FibonacciGrid:
         :return:
         """
 
-        r, c, l = cart2sph(self._x, self._y, self._z)
+        c, l, r = cart2sph(self._x, self._y, self._z)
         pts = np.array((r, c, l)).T
         # Extract r_domain
         above_domain = pts[pts[:, 0] >= r_max]
@@ -152,7 +152,7 @@ class FibonacciGrid:
         """
 
         if type == 'spherical':
-            r, c, l = cart2sph(self._x, self._y, self._z)
+            c, l, r = cart2sph(self._x, self._y, self._z)
             if is_normalised:
                 return r / self.r_earth, c, l
             else:
