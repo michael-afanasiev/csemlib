@@ -5,7 +5,7 @@ import os
 import numpy as np
 import xarray
 
-
+from csemlib.background.dtpts import GridData
 from csemlib.background.fibonacci_grid import FibonacciGrid
 from csemlib.models.model import Model, shade, triangulate, interpolate, write_vtk
 from csemlib.utils import sph2cart, rotate, cart2sph
@@ -33,6 +33,8 @@ class Ses3d_rbf(Ses3d):
         super(Ses3d_rbf, self).__init__(name, directory, components,
                  rotation_vector, rotation_angle, doi)
         self.read()
+        self.grid_data_ses3d = GridData()
+        self.component_type = 'perturbation'
 
 
     def split_domain(self, pts_original, pts_new):
@@ -56,29 +58,21 @@ class Ses3d_rbf(Ses3d):
 
 
     def get_data_pts_model(self):
-        model_coords = np.zeroes(len(self.data['x'].values.ravel()), 3)
-        model_coords[:,0] = self.data['x'].values.ravel()
-        model_coords[:,1] = self.data['y'].values.ravel()
-        model_coords[:,2] = self.data['z'].values.ravel()
+        x = self.data['x'].values.ravel()
+        y = self.data['y'].values.ravel()
+        z = self.data['z'].values.ravel()
+        self.grid_data_ses3d = GridData(x, y, z, components=self.components)
 
-        model_data = np.zeroes(len(self.data['x'].values.ravel()), len(self.components))
-
-        index = 0
         for component in self.components:
-            model_data[:, index] = self.data[component].values.ravel
-            index += 1
+            self.grid_data_ses3d.set_component(component, self.data[component].values.ravel())
 
-        return model_coords, model_data
 
     def eval_point_cloud(self,c, l, r, rho, vpv, vsv, vsh, GridData):
-        model_coords, model_data = self.get_data_pts_model()
+        pts_original = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
+        data = self.grid_data_ses3d.get_data()
 
-        x, y, z = GridData.get_coordinates()
-        pts_new = np.array((x, y, z)).T
-
-        pts_original = model_coords
-        data = model_data
-
+        # Only include points that lie within convex hull
+        pts_new = GridData.get_coordinates(coordinate_type='cartesian')
         pts_new, pts_other = self.split_domain(pts_original, pts_new)
 
         # Generate KDTrees
@@ -88,11 +82,13 @@ class Ses3d_rbf(Ses3d):
         _, pairs = pnt_tree_orig.query(pts_new, k=6)
 
         i = 0
+
+
         dat_new = np.zeros(np.shape(pts_new)[0])
         for idx in pairs:
             x_c_orig, y_c_orig, z_c_orig = pts_original[idx].T
+            
             dat_orig = data[idx]
-
             rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig)
             x_c_new, y_c_new, z_c_new = pts_new[i]
             dat_new[i] = rbfi(x_c_new, y_c_new, z_c_new)
