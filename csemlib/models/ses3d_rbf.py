@@ -1,25 +1,11 @@
-import datetime
-import io
-import os
-
-import numpy as np
-import xarray
-
-from csemlib.background.dtpts import GridData
-from csemlib.background.fibonacci_grid import FibonacciGrid
-from csemlib.models.model import Model, shade, triangulate, interpolate, write_vtk
-from csemlib.utils import sph2cart, rotate, cart2sph
+from csemlib.background.grid_data import GridData
 from csemlib.models.ses3d import Ses3d
-
 
 import numpy as np
 import scipy.spatial as spatial
 from scipy.interpolate import Rbf
 from scipy.spatial.qhull import ConvexHull
 from scipy.interpolate import griddata
-
-# from .model import Model, shade, triangulate, interpolate
-# from ..utils import sph2cart, rotate
 
 
 
@@ -35,29 +21,35 @@ class Ses3d_rbf(Ses3d):
         self.read()
         self.grid_data_ses3d = GridData()
         self.component_type = 'perturbation'
+        self.init_grid_data()
+        self.interp_method = 'griddata_linear'
+        self.model_type = 'absolute'
 
+    def split_domain(self, GridData):
+        ses3d_pts = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
 
-    def split_domain(self, pts_original, pts_new):
-        hull = ConvexHull(pts_original)
+        # Collect all the points that form the convex hull
+        hull = ConvexHull(ses3d_pts)
         pts_hull = []
         for point in np.unique(hull.simplices.flatten()):
-            pts_hull.append(pts_original[point])
+            pts_hull.append(ses3d_pts[point])
         pts_hull = np.array(pts_hull)
 
-        # Generate convex hull of original points and only continue with points that fall inside
+        # Perform Delauney triangulation from hull points
         hull = spatial.Delaunay(pts_hull)
 
         # Split points into points that fall inside and outside of convex hull
-        in_or_out = hull.find_simplex(pts_new)>=0
+        in_or_out = hull.find_simplex(GridData.get_coordinates(coordinate_type='cartesian'))>=0
         indices_in = np.where(in_or_out == True)
         indices_out = np.where(in_or_out == False)
-        pts_other = pts_new[indices_out]
-        pts_new = pts_new[indices_in]
+
+        pts_other = GridData[indices_out]
+        pts_new = GridData[indices_in]
 
         return pts_new, pts_other
 
 
-    def get_data_pts_model(self):
+    def init_grid_data(self):
         x = self.data['x'].values.ravel()
         y = self.data['y'].values.ravel()
         z = self.data['z'].values.ravel()
@@ -66,188 +58,45 @@ class Ses3d_rbf(Ses3d):
         for component in self.components:
             self.grid_data_ses3d.set_component(component, self.data[component].values.ravel())
 
+    def eval_point_cloud(self, GridData):
+        grid_coords = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
 
-    def eval_point_cloud(self,c, l, r, rho, vpv, vsv, vsh, GridData):
-        pts_original = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
-        data = self.grid_data_ses3d.get_data()
-
-        # Only include points that lie within convex hull
-        pts_new = GridData.get_coordinates(coordinate_type='cartesian')
-        pts_new, pts_other = self.split_domain(pts_original, pts_new)
+        # Split domain in points that lie within convex hull and fall outside
+        grid_inside, grid_outside = self.split_domain(GridData)
 
         # Generate KDTrees
-        pnt_tree_orig = spatial.cKDTree(pts_original)
+        pnt_tree_orig = spatial.cKDTree(grid_coords)
 
-        # Method based on nearest points:
-        _, pairs = pnt_tree_orig.query(pts_new, k=6)
+        # Use 6 nearest points
+        _, pairs = pnt_tree_orig.query(grid_inside.get_coordinates(coordinate_type='cartesian'), k=30)
 
+        # Interpolate ses3d value for each grid point
         i = 0
-
-
-        dat_new = np.zeros(np.shape(pts_new)[0])
         for idx in pairs:
-            x_c_orig, y_c_orig, z_c_orig = pts_original[idx].T
-            
-            dat_orig = data[idx]
-            rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig)
-            x_c_new, y_c_new, z_c_new = pts_new[i]
-            dat_new[i] = rbfi(x_c_new, y_c_new, z_c_new)
+            x_c_orig, y_c_orig, z_c_orig = grid_coords[idx].T
+            for component in self.components:
+                dat_orig = self.grid_data_ses3d.df[component][idx].values
 
+
+                coords_new = grid_inside.get_coordinates(coordinate_type='cartesian').T
+                x_c_new, y_c_new, z_c_new = coords_new.T[i]
+
+                if self.interp_method == 'griddata_linear':
+                    pts_local = np.array((x_c_orig, y_c_orig, z_c_orig)).T
+                    xi = np.array((x_c_new, y_c_new, z_c_new))
+                    val = griddata(pts_local, dat_orig, xi, method='linear', fill_value=0.0)
+                else:
+                    rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig, function='linear')
+                    val = rbfi(x_c_new, y_c_new, z_c_new)
+
+                if self.model_type == 'perturbation_percent':
+                    grid_inside.df[component[1:]][i] *= (1 + val/100.0)
+                elif self.model_type == 'absolute':
+                    grid_inside.df[component[1:]][i] = val
             i += 1
 
+            if i % 200 == 0:
+                print(i)
 
-        pts_all = np.append(pts_new, pts_other, axis=0)
-        dat_all = np.append(dat_new, np.zeros_like(pts_other[:,0]))
-
-        return pts_all, dat_all
-
-
-
-def in_hull(p, hull):
-    """
-    Test if points in `p` are in `hull`
-
-    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
-    `hull` is either a scipy.spatial.Delaunay object or the `MxK` array of the
-    coordinates of `M` points in `K`dimensions for which Delaunay triangulation
-    will be computed
-    """
-
-    from scipy.spatial import Delaunay
-    if not isinstance(hull,Delaunay):
-        hull = Delaunay(hull)
-    return hull
-    #return hull.find_simplex(p)>=0
-
-
-
-
-
-# Get original data (this seems to work fine)
-mod = Ses3d_rbf('japan', os.path.join('/home/sed/CSEM/csemlib/tests/test_data', 'japan'),
-                components=['drho', 'dvsv', 'dvsh', 'dvp'])
-# mod.read()
-
-d = mod.data['dvsv'].values.ravel()
-x = mod.data['x'].values.ravel()
-y = mod.data['y'].values.ravel()
-z = mod.data['z'].values.ravel()
-
-_, l, r = cart2sph(x, y, z)
-pts_original = np.array((x, y, z)).T
-data = np.array(d)
-#data = np.degrees(l)
-
-
-#  Generate visualisation grid
-fib_grid = FibonacciGrid()
-# Set global background grid
-radii = np.linspace(6250.0, 0.0, 15)
-resolution = np.ones_like(radii) * (6350.0 / 15)
-fib_grid.set_global_sphere(radii, resolution)
-# refinement region coarse
-c_min = np.radians(30)
-c_max = np.radians(70)
-l_min = np.radians(120)
-l_max = np.radians(160)
-radii_regional = np.linspace(6250.0, 6150.0, 4)
-resolution_regional = np.ones_like(radii_regional) * 50
-fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
-x, y, z = fib_grid.get_coordinates()
-pts_new = np.array((x, y, z)).T
-
-
-
-hull = ConvexHull(pts_original)
-pts_hull = []
-for point in np.unique(hull.simplices.flatten()):
-    pts_hull.append(pts_original[point])
-pts_hull = np.array(pts_hull)
-
-# Generate convex hull of original points and only continue with points that fall inside
-hull = spatial.Delaunay(pts_hull)
-
-# Split points into points that fall inside and outside of convex hull
-in_or_out = hull.find_simplex(pts_new)>=0
-indices_in = np.where(in_or_out == True)
-indices_out = np.where(in_or_out == False)
-pts_other = pts_new[indices_out]
-pts_new = pts_new[indices_in]
-
-# Generate KDTrees
-pnt_tree_orig = spatial.cKDTree(pts_original)
-
-
-# pnt_tree_new = spatial.cKDTree(pts_new)
-#
-# r = 50
-# all_pairs = pnt_tree_new.query_ball_tree(pnt_tree_orig, r)
-#
-# i = 0
-# max_pair = 0
-# dat_new = np.zeros(np.shape(pts_new)[0])
-# for pairs in all_pairs:
-#     if len(pairs) < 3:
-#         i += 1
-#         continue
-#     if len(pairs) > max_pair:
-#         max_pair = len(pairs)
-#
-#     # Original coords and data
-#     x_c_orig, y_c_orig, z_c_orig = pnt_tree_orig.data[pairs].T
-#     dat_orig = data[pairs]
-#
-#     rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig)
-#
-#     # New coords and data
-#     pts_local = np.array((x_c_orig, y_c_orig, z_c_orig)).T
-#     x_c_new, y_c_new, z_c_new = pnt_tree_new.data[i]
-#     #print x_c_new, y_c_new
-#
-#     xi = np.array((x_c_new, y_c_new, z_c_new))
-#
-#     #dat_new[i] = griddata(pts_local, dat_orig, xi, method='nearest', fill_value=-5.0)
-#     dat_new[i] = rbfi(x_c_new, y_c_new, z_c_new)
-#     i += 1
-#     if i % 100 == 0:
-#         print(len(pairs))
-#         print(i)
-
-
-# Method based on nearest points:
-_, pairs = pnt_tree_orig.query(pts_new, k=10)
-
-i = 0
-dat_new = np.zeros(np.shape(pts_new)[0])
-for idx in pairs:
-    x_c_orig, y_c_orig, z_c_orig = pts_original[idx].T
-    dat_orig = data[idx]
-
-    rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig)
-    x_c_new, y_c_new, z_c_new = pts_new[i]
-    dat_new[i] = rbfi(x_c_new, y_c_new, z_c_new)
-
-    i += 1
-
-    if i % 100 == 0:
-        print(len(pairs))
-        print(i)
-
-
-
-pts_all = np.append(pts_new, pts_other, axis=0)
-dat_all = np.append(dat_new, np.zeros_like(pts_other[:,0]))
-
-# Write to vtk
-x, y, z = pts_all.T
-elements = triangulate(x, y, z)
-write_vtk(os.path.join('ses_check.vtk'), pts_all, elements, dat_all, 'ses3d')
-
-
-# x, y, z = pts_all.T
-# #dat_hull = np.ones_like(x)
-# elements = triangulate(x, y, z)
-# #print(np.shape(pts_hull))
-#
-# pts = np.array((x, y, z)).T
-# write_vtk("ses3d_kd_tree.vtk", pts_all, elements, dat_all, 'hull')
+        grid_inside.append(grid_outside)
+        return grid_inside
