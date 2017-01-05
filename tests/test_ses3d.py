@@ -45,32 +45,31 @@ DECIMAL_CLOSE = 3
 #  Generate visualisation grid
 fib_grid = FibonacciGrid()
 # Set global background grid
-radii = np.linspace(6250.0, 6250, 1)
-resolution = np.ones_like(radii) * (6350.0 / 15)
-#fib_grid.set_global_sphere(radii, resolution)
+radii = np.linspace(6371.0, 0, 15)
+resolution = np.ones_like(radii) * (6371.0 / 15)
+fib_grid.set_global_sphere(radii, resolution)
 # refinement region coarse
-c_min = np.radians(30)
-c_max = np.radians(70)
-l_min = np.radians(120)
-l_max = np.radians(160)
-radii_regional = np.linspace(6250.0, 6250.0, 1)
-resolution_regional = np.ones_like(radii_regional) * 25
+c_min = np.radians(35)
+c_max = np.radians(65)
+l_min = np.radians(125)
+l_max = np.radians(155)
+radii_regional = np.linspace(6371.0, 5771.0, 14)
+resolution_regional = np.ones_like(radii_regional) * 50
 fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
 x, y, z = fib_grid.get_coordinates()
 pts_new = np.array((x, y, z)).T
 
 c, l, r = cart2sph(x, y, z)
 
-
+print(len(r))
 # Evaluate Prem
 rho, vpv, vsv, vsh = prem_eval_point_cloud(r)
 
 components = ['rho', 'vp', 'vsv', 'vsh']
 grid_data = GridData(x, y, z, components=components)
 
-grid_data.set_component('vsv', np.zeros(len(grid_data)))
-
-
+#grid_data.set_component('vsv', np.ones(len(grid_data)))
+grid_data.set_component('vsv', vsv)
 
 mod = Ses3d_rbf('japan', os.path.join('/home/sed/CSEM/csemlib/tests/test_data', 'japan'),
                 components=['dvsv'])

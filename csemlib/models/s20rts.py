@@ -191,3 +191,104 @@ class S20rts(Model):
                (rads - bottom_rad) + bottom_vals
 
         return vals
+
+
+
+############ WORK ON GRIDDATA VERSION BELOW ##########
+
+    def split_domains_griddata(self, GRi):
+        """
+        This splits an array of pts of all values into a
+        :param pts:
+        :return:
+        """
+        s20rts_dmn = pts[pts[:, 2] <= self.layers[0]]
+        s20rts_dmn = s20rts_dmn[s20rts_dmn[:, 2] >= self.layers[-1]]
+        above_dmn = pts[pts[:, 2] > self.layers[0]]
+        below_dmn = pts[pts[:, 2] < self.layers[-1]]
+        non_s20_dmn = np.append(above_dmn, below_dmn, axis=0)
+        return s20rts_dmn, non_s20_dmn
+
+
+    def eval_point_cloud_griddata(self, GridData):
+        """
+        This returns the linearly interpolated perturbations of s20rts. Careful only points that fall inside
+        of the domain of s20rts are returned.
+        :param c: colatitude
+        :param l: longitude
+        :param r: distance from core in km
+        :param rho: param to be returned - currently not used
+        :param vpv: param to be returned - currently not used
+        :param vsv: param to be returned - currently not used
+        :param vsh: param to be returned - currently not used
+        :return c, l, r, rho, vpv, vsv, vsh
+        """
+
+        self.read()
+
+
+        pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
+
+
+        s20rts_dmn, non_s20_dmn = self.split_domains(pts)
+        # Initialize arrays to store evaluated points in the correct order
+        c = np.zeros(0)
+        l = np.zeros(0)
+        r = np.zeros(0)
+        rho = np.zeros(0)
+        vpv = np.zeros(0)
+        vsv = np.zeros(0)
+        vsh = np.zeros(0)
+
+        # Only run when it exists
+        if len(s20rts_dmn) > 0:
+            for i in range(len(self.layers) - 1):
+                upper_rad = self.layers[i]
+                lower_rad = self.layers[i+1]
+
+                # Extract chunk for interpolation
+                if i == 0:
+                    chunk = s20rts_dmn[s20rts_dmn[:, 2] <= upper_rad + np.finfo(float).eps]
+                else:
+                    chunk = s20rts_dmn[s20rts_dmn[:, 2] <= upper_rad]
+
+                if i < len(self.layers) - 2:
+                    chunk = chunk[chunk[:, 2] > lower_rad]
+                else:
+                    chunk = chunk[chunk[:, 2] >= lower_rad - np.finfo(float).eps]
+
+                chunk_c, chunk_l, chunk_r, chunk_rho, chunk_vpv, chunk_vsv, chunk_vsh = chunk.T
+
+                # Evaluate S20RTS at upper and lower end of chunk, use these to interpolate
+                top_vals = self.eval(chunk_c, chunk_l, upper_rad, 'test')
+                bottom_vals = self.eval(chunk_c, chunk_l, lower_rad, 'test')
+
+                # Interpolate
+                chunk_vals = self.linear_interpolation(bottom_vals, top_vals, lower_rad, upper_rad, chunk_r)
+
+                # Compute vp perturbations
+                R0 = 1.25
+                R2891 = 3.0
+                vp_slope = (R2891 - R0) / 2891.0
+                rDep = vp_slope * (self.r_earth - chunk_r) + R0
+                vp_val = chunk_vals / rDep
+
+                # Add perturbations
+                chunk_vpv *= (1 + vp_val)
+                chunk_vsv *= (1 + chunk_vals)
+                chunk_vsh *= (1 + chunk_vals)
+
+                # Store perturbed values
+                c = np.append(c, chunk_c)
+                r = np.append(r, chunk_r)
+                l = np.append(l, chunk_l)
+                rho = np.append(rho, chunk_rho)
+                vpv = np.append(vpv, chunk_vpv)
+                vsv = np.append(vsv, chunk_vsv)
+                vsh = np.append(vsh, chunk_vsh)
+
+        s20rts_dmn = np.array((c, l, r, rho, vpv, vsv, vsh)).T
+
+        pts = np.append(s20rts_dmn, non_s20_dmn, axis=0)
+
+        return pts

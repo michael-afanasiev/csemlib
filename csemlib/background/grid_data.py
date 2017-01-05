@@ -1,5 +1,3 @@
-
-
 import pandas as pd
 import numpy as np
 
@@ -10,7 +8,7 @@ from csemlib.utils import cart2sph, sph2cart
 class GridData:
     """
     Class that serves as a collection point of information on the grid,
-    its coordinates and the corresponding data
+    its coordinates and the corresponding data.
     """
 
     def __init__(self, x=[], y=[], z=[], components=[], coord_system='cartesian'):
@@ -70,7 +68,9 @@ class GridData:
         else:
             return self.df[self.coordinates].values
 
-#
+
+
+
 # # Generate visualisation grid
 # fib_grid = FibonacciGrid()
 # # Set global background grid
@@ -90,5 +90,5 @@ class GridData:
 #
 # # Setup GridData
 # grid_data = GridData(*fib_grid.get_coordinates())
-#
-# print(len(grid_data))
+# grid_data2 = grid_data[:2].df
+# print(len(grid_data2))

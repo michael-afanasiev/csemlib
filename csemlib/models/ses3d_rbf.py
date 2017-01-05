@@ -20,10 +20,9 @@ class Ses3d_rbf(Ses3d):
                  rotation_vector, rotation_angle, doi)
         self.read()
         self.grid_data_ses3d = GridData()
-        self.component_type = 'perturbation'
         self.init_grid_data()
         self.interp_method = 'griddata_linear'
-        self.model_type = 'absolute'
+        self.model_type = 'perturbation_percent'
 
     def split_domain(self, GridData):
         ses3d_pts = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
@@ -67,8 +66,8 @@ class Ses3d_rbf(Ses3d):
         # Generate KDTrees
         pnt_tree_orig = spatial.cKDTree(grid_coords)
 
-        # Use 6 nearest points
-        _, pairs = pnt_tree_orig.query(grid_inside.get_coordinates(coordinate_type='cartesian'), k=30)
+        # Use 20 nearest points
+        _, pairs = pnt_tree_orig.query(grid_inside.get_coordinates(coordinate_type='cartesian'), k=20)
 
         # Interpolate ses3d value for each grid point
         i = 0
