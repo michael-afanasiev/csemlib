@@ -282,7 +282,7 @@ def test_add_crust_and_s20rts_prem():
     """
 
     # Generate point cloud based on average distance to the next point
-    num_layers = 10
+    num_layers = 20
     radii = np.linspace(6371.0, 0.0, num_layers)
     r_earth = 6371.0
     res = r_earth / num_layers

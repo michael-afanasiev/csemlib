@@ -200,3 +200,50 @@ class Ses3d(Model):
                 interpolate(indices, barycentric_coordinates, self.data[p].values.ravel()), dtype=np.float64))
 
         return np.array(interp_param).T
+
+
+    def eval_point_cloud_griddata(self, GridData):
+
+        # Read ModelInfo
+        import yaml
+
+        with io.open(os.path.join(self.directory, 'modelinfo.yml'), 'rt') as fh:
+            try:
+                model_info = yaml.load(fh)
+            except yaml.YAMLError as exc:
+                print(exc)
+
+        # Read model
+        self.components = GridData.components
+        self.read()
+
+        # Get dmn
+        ses3d_dmn = extract_ses3d_dmn(GridData, model_info)
+
+        # Interpolate
+        interp = self.eval(ses3d_dmn['x'], ses3d_dmn['y'], ses3d_dmn['z'], self.components)
+
+        for i, p in enumerate(self.components):
+            if model_info['component_type'] == 'perturbation':
+                ses3d_dmn[p] = ses3d_dmn[p] * (1 + interp[:, i]/100)
+            elif model_info['component_type'] == 'absolute':
+                ses3d_dmn[p] = interp[:, i]
+
+        GridData.df.update(ses3d_dmn)
+
+        return GridData
+
+def extract_ses3d_dmn(GridData, model_info):
+    if model_info['geometry']['rotation'] is True:
+        raise NotImplementedError('Rotation not implemented yet')
+
+    geometry = model_info['geometry']
+    ses3d_dmn = GridData.df.copy()
+    ses3d_dmn = ses3d_dmn[ses3d_dmn['c'] >= np.deg2rad(geometry['cmin'])]
+    ses3d_dmn = ses3d_dmn[ses3d_dmn['c'] <= np.deg2rad(geometry['cmax'])]
+    ses3d_dmn = ses3d_dmn[ses3d_dmn['l'] >= np.deg2rad(geometry['lmin'])]
+    ses3d_dmn = ses3d_dmn[ses3d_dmn['l'] <= np.deg2rad(geometry['lmax'])]
+    ses3d_dmn = ses3d_dmn[ses3d_dmn['r'] >= geometry['rmin']]
+    ses3d_dmn = ses3d_dmn[ses3d_dmn['r'] <= geometry['rmax']]
+
+    return ses3d_dmn

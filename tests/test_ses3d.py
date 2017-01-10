@@ -6,8 +6,10 @@ import csemlib.background.skeleton as skl
 import csemlib.models.ses3d as s3d
 from csemlib.background.grid_data import GridData
 from csemlib.background.fibonacci_grid import FibonacciGrid
+from csemlib.models.crust import Crust
 from csemlib.models.model import triangulate, write_vtk
 from csemlib.models.one_dimensional import prem_eval_point_cloud
+from csemlib.models.s20rts import S20rts
 from csemlib.models.ses3d_rbf import Ses3d_rbf
 from csemlib.utils import cart2sph
 
@@ -42,20 +44,59 @@ DECIMAL_CLOSE = 3
 
 
 
+# #  Generate visualisation grid
+# fib_grid = FibonacciGrid()
+# # Set global background grid
+# radii = np.linspace(6371.0, 0, 15)
+# resolution = np.ones_like(radii) * (6371.0 / 15)
+# fib_grid.set_global_sphere(radii, resolution)
+# # refinement region coarse
+# c_min = np.radians(35)
+# c_max = np.radians(65)
+# l_min = np.radians(125)
+# l_max = np.radians(155)
+# radii_regional = np.linspace(6371.0, 5771.0, 14)
+# resolution_regional = np.ones_like(radii_regional) * 50
+# fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
+# x, y, z = fib_grid.get_coordinates()
+# pts_new = np.array((x, y, z)).T
+#
+# c, l, r = cart2sph(x, y, z)
+#
+# print(len(r))
+# # Evaluate Prem
+# rho, vpv, vsv, vsh = prem_eval_point_cloud(r)
+#
+# components = ['rho', 'vp', 'vsv', 'vsh']
+# grid_data = GridData(x, y, z, components=components)
+#
+# #grid_data.set_component('vsv', np.ones(len(grid_data)))
+# grid_data.set_component('vsv', vsv)
+#
+# mod = Ses3d_rbf('japan', os.path.join('/home/sed/CSEM/csemlib/tests/test_data', 'japan'),
+#                 components=['dvsv'])
+#
+# grid_data = mod.eval_point_cloud(grid_data)
+#
+#
+# x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
+# dat = grid_data.df['vsv'].values
+# elements = triangulate(x, y, z)
+# # #print(np.shape(pts_hull))
+#
+# pts = np.array((x, y, z)).T
+# write_vtk("ses3d_griddata_rbf.vtk", pts, elements, dat, 'ses3dvsv')
+
+##########################################################################
 #  Generate visualisation grid
 fib_grid = FibonacciGrid()
 # Set global background grid
-radii = np.linspace(6371.0, 0, 15)
-resolution = np.ones_like(radii) * (6371.0 / 15)
+radii = np.linspace(6371.0, 5371.0, 11)
+radii = np.append(radii, 0)
+resolution = np.ones_like(radii) * (1000.0 / 11)
+resolution = np.append(resolution, 1)
 fib_grid.set_global_sphere(radii, resolution)
-# refinement region coarse
-c_min = np.radians(35)
-c_max = np.radians(65)
-l_min = np.radians(125)
-l_max = np.radians(155)
-radii_regional = np.linspace(6371.0, 5771.0, 14)
-resolution_regional = np.ones_like(radii_regional) * 50
-fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
+
 x, y, z = fib_grid.get_coordinates()
 pts_new = np.array((x, y, z)).T
 
@@ -63,19 +104,31 @@ c, l, r = cart2sph(x, y, z)
 
 print(len(r))
 # Evaluate Prem
+
 rho, vpv, vsv, vsh = prem_eval_point_cloud(r)
 
-components = ['rho', 'vp', 'vsv', 'vsh']
-grid_data = GridData(x, y, z, components=components)
+grid_data = GridData(x, y, z)
 
-#grid_data.set_component('vsv', np.ones(len(grid_data)))
+# This line is required for some evaluations, maybe change this to internally always store c,l,r
+grid_data.add_col_lon_rad()
+
+#grid_data.set_component('rho', rho)
+# grid_data.set_component('vpv', vpv)
+# grid_data.set_component('vph', vpv)
+# grid_data.set_component('vsh', vsh)
 grid_data.set_component('vsv', vsv)
+
+
+cst = Crust()
+grid_data = cst.eval_point_cloud_grid_data(grid_data)
+
+s20 = S20rts()
+grid_data = s20.eval_point_cloud_griddata(grid_data)
 
 mod = Ses3d_rbf('japan', os.path.join('/home/sed/CSEM/csemlib/tests/test_data', 'japan'),
                 components=['dvsv'])
 
 grid_data = mod.eval_point_cloud(grid_data)
-
 
 x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
 dat = grid_data.df['vsv'].values
@@ -83,4 +136,4 @@ elements = triangulate(x, y, z)
 # #print(np.shape(pts_hull))
 
 pts = np.array((x, y, z)).T
-write_vtk("ses3d_griddata_rbf.vtk", pts, elements, dat, 'ses3dvsv')
+write_vtk("ses3d_griddata_s20.vtk", pts, elements, dat, 'ses3dvsv')

@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
+import copy
 
 from csemlib.background.fibonacci_grid import FibonacciGrid
+from csemlib.models.s20rts import S20rts
 from csemlib.utils import cart2sph, sph2cart
 
 
@@ -31,6 +33,9 @@ class GridData:
 
     def __len__(self):
         return len(self.df)
+
+    def copy(self):
+        return copy.deepcopy(self)
 
     def append(self, griddata):
         self.df = self.df.append(griddata.df)
@@ -68,6 +73,9 @@ class GridData:
         else:
             return self.df[self.coordinates].values
 
+    def add_col_lon_rad(self):
+        if self.coordinates is not ['c', 'l', 'r']:
+            self.df['c'], self.df['l'], self.df['r'] = cart2sph(self.df['x'], self.df['y'], self.df['z'])
 
 
 
@@ -87,8 +95,17 @@ class GridData:
 # fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
 #
 #
+# s20 = S20rts()
 #
 # # Setup GridData
 # grid_data = GridData(*fib_grid.get_coordinates())
-# grid_data2 = grid_data[:2].df
-# print(len(grid_data2))
+#
+# grid_data_copy = grid_data.copy()
+#
+#
+# s20dmn = s20.eval_point_cloud_griddata(grid_data)
+#
+# grid_data.add_col_lon_rad()
+#
+#
+# print(grid_data.df)

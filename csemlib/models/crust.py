@@ -110,6 +110,35 @@ class Crust(Model):
 
         return pts
 
+    def eval_point_cloud_grid_data(self, GridData):
+            r_earth = 6371.0
+
+            # Split into crustal and non crustal zone
+            cst_zone = GridData.df[GridData.df['r'] >= (r_earth - 100.0)]
+
+            # Compute crustal depths and vs for crustal zone coordinates
+            self.read()
+
+            # This guy was changing the coordinates which somehow made it work before, with that fixed it does not work anymore
+            crust_dep = self.eval(cst_zone['c'], cst_zone['l'], param='crust_dep', crust_smooth_factor=1e1)
+            crust_vs = self.eval(cst_zone['c'], cst_zone['l'], param='crust_vs', crust_smooth_factor=0)
+
+            # Get Topography
+            top = Topography()
+            top.read()
+            topo = top.eval(cst_zone['c'], cst_zone['l'], param='topo')
+
+            # Increase crustal depth for regions with topography
+            crust_dep[topo >= 0] = crust_dep[topo >= 0] + topo[topo >= 0]
+
+            # Add crust
+            cst_zone = add_crust_all_params_topo_griddata(cst_zone, crust_dep, crust_vs, topo)
+            # Append crustal and non crustal zone back together
+            GridData.df.update(cst_zone)
+
+            return GridData
+
+
 def add_crust_all_params_topo(r, crust_dep, crust_vs, topo, rho, vpv, vsv, vsh):
     r_earth = 6371.0
     for i in range(len(r)):
@@ -131,3 +160,38 @@ def add_crust_all_params_topo(r, crust_dep, crust_vs, topo, rho, vpv, vsv, vsh):
             continue
 
     return rho, vpv, vsv, vsh
+
+
+
+def add_crust_all_params_topo_griddata(cst_zone, crust_dep, crust_vs, topo):
+    r_earth = 6371.0
+    for i in range(len(cst_zone['r'])):
+        if cst_zone['r'].values[i] > (r_earth - crust_dep[i]):
+            # Do something with param here
+            if 'vsv' in cst_zone.columns:
+                cst_zone['vsv'].values[i] = crust_vs[i]
+            if 'vsh' in cst_zone.columns:
+                cst_zone['vsh'].values[i] = crust_vs[i]
+
+            # Continental crust
+            if topo[i] >= 0:
+                if 'vpv' in cst_zone.columns:
+                    cst_zone['vpv'].values[i] = 1.5399 * crust_vs[i] + 0.840
+                if 'vph' in cst_zone.columns:
+                    cst_zone['vph'].values[i] = 1.5399 * crust_vs[i] + 0.840
+                if 'rho' in cst_zone.columns:
+                    cst_zone['rho'].values[i] = 0.2277 * crust_vs[i] + 2.016
+
+            # Oceanic crust
+            if topo[i] < 0:
+                if 'vpv' in cst_zone.columns:
+                    cst_zone['vpv'].values[i] = 1.5865 * crust_vs[i] + 0.844
+                if 'vph' in cst_zone.columns:
+                    cst_zone['vph'].values[i] = 1.5865 * crust_vs[i] + 0.844
+                if 'rho' in cst_zone.columns:
+                    cst_zone['rho'].values[i] = 0.2547 * crust_vs[i] + 1.979
+
+        else:
+            continue
+
+    return cst_zone

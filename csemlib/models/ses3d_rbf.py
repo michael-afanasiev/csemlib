@@ -67,7 +67,7 @@ class Ses3d_rbf(Ses3d):
         pnt_tree_orig = spatial.cKDTree(grid_coords)
 
         # Use 20 nearest points
-        _, pairs = pnt_tree_orig.query(grid_inside.get_coordinates(coordinate_type='cartesian'), k=20)
+        _, pairs = pnt_tree_orig.query(grid_inside.get_coordinates(coordinate_type='cartesian'), k=30)
 
         # Interpolate ses3d value for each grid point
         i = 0

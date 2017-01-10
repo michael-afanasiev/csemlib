@@ -1,0 +1,17 @@
+geometry:
+  rmin: 5771.0
+  rmax: 6371.0
+  cmin: 30.0
+  cmax: 75.0
+  lmin: 115.0
+  lmax: 160.0
+  rotation: False
+  rot_1: 0
+  rot_2: 0
+  rot_3: 0
+component_type: perturbation
+components:
+  - rho
+  - vp
+  - vsh
+  - vsv
