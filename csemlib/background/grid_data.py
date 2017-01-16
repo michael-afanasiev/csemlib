@@ -3,14 +3,13 @@ import numpy as np
 import copy
 
 from csemlib.background.fibonacci_grid import FibonacciGrid
-from csemlib.models.s20rts import S20rts
-from csemlib.utils import cart2sph, sph2cart
+from csemlib.utils import cart2sph, sph2cart, get_rot_matrix, rotate
 
 
 class GridData:
     """
     Class that serves as a collection point of information on the grid,
-    its coordinates and the corresponding data.
+    its coordinates and the corresponding data. Data and coordinates must have the same length.
     """
 
     def __init__(self, x=[], y=[], z=[], components=[], coord_system='cartesian'):
@@ -23,6 +22,10 @@ class GridData:
         self.df = pd.DataFrame(np.array((x, y, z)).T, columns=self.coordinates)
         self.add_components(components)
 
+        if self.coordinate_system == 'cartesian':
+            self.add_col_lon_rad()
+        elif self.coordinate_system == 'spherical':
+            self.add_xyz()
 
     def __getitem__(self, i):
         x, y, z = self.df[self.coordinates].loc[i].values.T
@@ -74,38 +77,14 @@ class GridData:
             return self.df[self.coordinates].values
 
     def add_col_lon_rad(self):
-        if self.coordinates is not ['c', 'l', 'r']:
-            self.df['c'], self.df['l'], self.df['r'] = cart2sph(self.df['x'], self.df['y'], self.df['z'])
+        self.df['c'], self.df['l'], self.df['r'] = cart2sph(self.df['x'], self.df['y'], self.df['z'])
 
+    def add_xyz(self):
+        self.df['x'], self.df['y'], self.df['z'] = sph2cart(self.df['c'], self.df['l'], self.df['r'])
 
+    def rotate(self, angle, x, y, z):
+        rot_mat = get_rot_matrix(angle, x, y, z)
+        self.df['x'], self.df['y'], self.df['z'] = rotate(self.df['x'], self.df['y'], self.df['z'], rot_mat)
 
-# # Generate visualisation grid
-# fib_grid = FibonacciGrid()
-# # Set global background grid
-# radii = np.linspace(6250.0, 0.0, 15)
-# resolution = np.ones_like(radii) * (6350.0 / 15)
-# fib_grid.set_global_sphere(radii, resolution)
-# # refinement region coarse
-# c_min = np.radians(30)
-# c_max = np.radians(70)
-# l_min = np.radians(120)
-# l_max = np.radians(160)
-# radii_regional = np.linspace(6250.0, 6150.0, 4)
-# resolution_regional = np.ones_like(radii_regional) * 50
-# fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
-#
-#
-# s20 = S20rts()
-#
-# # Setup GridData
-# grid_data = GridData(*fib_grid.get_coordinates())
-#
-# grid_data_copy = grid_data.copy()
-#
-#
-# s20dmn = s20.eval_point_cloud_griddata(grid_data)
-#
-# grid_data.add_col_lon_rad()
-#
-#
-# print(grid_data.df)
+        # Also update c,l,r coordinates
+        self.add_col_lon_rad()

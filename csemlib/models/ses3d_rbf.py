@@ -1,3 +1,8 @@
+import io
+import os
+
+import sys
+
 from csemlib.background.grid_data import GridData
 from csemlib.models.ses3d import Ses3d
 
@@ -11,17 +16,15 @@ from scipy.interpolate import griddata
 
 class Ses3d_rbf(Ses3d):
     """
-    Class handling file-IO for a model in SES3D format.
+    Class built open Ses3D which adds extra interpolation methods
     """
 
-    def __init__(self, name, directory, components=[],
-                 rotation_vector=None, rotation_angle=None, doi=None):
-        super(Ses3d_rbf, self).__init__(name, directory, components,
-                 rotation_vector, rotation_angle, doi)
+    def __init__(self, name, directory, components=[], doi=None, interp_method='nearest neighbour'):
+        super(Ses3d_rbf, self).__init__(name, directory, components, doi)
         self.read()
         self.grid_data_ses3d = GridData()
         self.init_grid_data()
-        self.interp_method = 'griddata_linear'
+        self.interp_method = interp_method
         self.model_type = 'perturbation_percent'
 
     def split_domain(self, GridData):
@@ -57,45 +60,57 @@ class Ses3d_rbf(Ses3d):
         for component in self.components:
             self.grid_data_ses3d.set_component(component, self.data[component].values.ravel())
 
-    def eval_point_cloud(self, GridData):
-        grid_coords = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
 
+    def eval_point_cloud_griddata(self, GridData):
+        print('Evaluating SES3D model:', self.model_info['model'])
+
+        grid_coords = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
         # Split domain in points that lie within convex hull and fall outside
-        grid_inside, grid_outside = self.split_domain(GridData)
+        ses3d_dmn = self.extract_ses3d_dmn(GridData)
 
         # Generate KDTrees
         pnt_tree_orig = spatial.cKDTree(grid_coords)
 
+        # do nearest neighbour
+        if self.interp_method == 'nearest_neighbour':
+            _, indices = pnt_tree_orig.query(ses3d_dmn.get_coordinates(coordinate_type='cartesian'), k=1)
+            for component in self.components:
+                ses3d_dmn.df[:][component] = self.grid_data_ses3d.df['r'][indices].values
+
+            GridData.df.update(ses3d_dmn.df)
+            return
+
         # Use 20 nearest points
-        _, pairs = pnt_tree_orig.query(grid_inside.get_coordinates(coordinate_type='cartesian'), k=30)
+        _, all_neighbours = pnt_tree_orig.query(ses3d_dmn.get_coordinates(coordinate_type='cartesian'), k=50)
 
         # Interpolate ses3d value for each grid point
         i = 0
-        for idx in pairs:
-            x_c_orig, y_c_orig, z_c_orig = grid_coords[idx].T
+        for neighbours in all_neighbours:
+            x_c_orig, y_c_orig, z_c_orig = grid_coords[neighbours].T
             for component in self.components:
-                dat_orig = self.grid_data_ses3d.df[component][idx].values
-
-
-                coords_new = grid_inside.get_coordinates(coordinate_type='cartesian').T
+                dat_orig = self.grid_data_ses3d.df[component][neighbours].values
+                coords_new = ses3d_dmn.get_coordinates(coordinate_type='cartesian').T
                 x_c_new, y_c_new, z_c_new = coords_new.T[i]
 
                 if self.interp_method == 'griddata_linear':
                     pts_local = np.array((x_c_orig, y_c_orig, z_c_orig)).T
                     xi = np.array((x_c_new, y_c_new, z_c_new))
                     val = griddata(pts_local, dat_orig, xi, method='linear', fill_value=0.0)
-                else:
+                elif self.interp_method == 'radial_basis_func':
                     rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig, function='linear')
                     val = rbfi(x_c_new, y_c_new, z_c_new)
 
                 if self.model_type == 'perturbation_percent':
-                    grid_inside.df[component[1:]][i] *= (1 + val/100.0)
+                    ses3d_dmn.df[component].values[i] += val
                 elif self.model_type == 'absolute':
-                    grid_inside.df[component[1:]][i] = val
+                    ses3d_dmn.df[component].values[i] = val
             i += 1
 
             if i % 200 == 0:
-                print(i)
+                ind = float(i)
+                percent = ind/len(all_neighbours)*100.0
+                sys.stdout.write("\rProgress: %.1f%%" % percent)
+                sys.stdout.flush()
 
-        grid_inside.append(grid_outside)
-        return grid_inside
+        GridData.df.update(ses3d_dmn.df)
+        return GridData

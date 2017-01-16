@@ -77,40 +77,8 @@ class Crust(Model):
         return lut.ev(x, lon)
 
 
-    def eval_point_cloud(self, c, l, r, rho, vpv, vsv, vsh):
-
-        pts = np.array((c, l, r, rho, vpv, vsv, vsh)).T
-        r_earth = 6371.0
-
-        # Split into crustal and non crustal zone
-        cst_zone = pts[pts[:, 2] >= (r_earth - 100.0)]
-        non_cst_zone = pts[pts[:, 2] < (r_earth - 100.0)]
-
-        # Compute crustal depths and vs for crustal zone coordinates
-        self.read()
-
-        # This guy was changing the coordinates which somehow made it work before, with that fixed it does not work anymore
-        crust_dep = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_dep', crust_smooth_factor=1e1)
-        crust_vs = self.eval(cst_zone[:, 0], cst_zone[:, 1], param='crust_vs', crust_smooth_factor=0)
-
-        # Get Topography
-        top = Topography()
-        top.read()
-        topo = top.eval(cst_zone[:, 0], cst_zone[:, 1], param='topo')
-
-        # Increase crustal depth for regions with topography
-        crust_dep[topo >= 0] = crust_dep[topo >= 0] + topo[topo >= 0]
-
-        # Add crust
-        cst_zone[:, 3], cst_zone[:, 4], cst_zone[:, 5], cst_zone[:, 6] = \
-            add_crust_all_params_topo(cst_zone[:, 2], crust_dep, crust_vs,
-                                topo, cst_zone[:, 3], cst_zone[:, 4], cst_zone[:, 5], cst_zone[:, 6])
-        # Append crustal and non crustal zone back together
-        pts = np.append(cst_zone, non_cst_zone, axis=0)
-
-        return pts
-
     def eval_point_cloud_grid_data(self, GridData):
+            print('Evaluating Crust')
             r_earth = 6371.0
 
             # Split into crustal and non crustal zone
@@ -119,7 +87,6 @@ class Crust(Model):
             # Compute crustal depths and vs for crustal zone coordinates
             self.read()
 
-            # This guy was changing the coordinates which somehow made it work before, with that fixed it does not work anymore
             crust_dep = self.eval(cst_zone['c'], cst_zone['l'], param='crust_dep', crust_smooth_factor=1e1)
             crust_vs = self.eval(cst_zone['c'], cst_zone['l'], param='crust_vs', crust_smooth_factor=0)
 
@@ -139,30 +106,6 @@ class Crust(Model):
             return GridData
 
 
-def add_crust_all_params_topo(r, crust_dep, crust_vs, topo, rho, vpv, vsv, vsh):
-    r_earth = 6371.0
-    for i in range(len(r)):
-        if r[i] > (r_earth - crust_dep[i]):
-            # Do something with param here
-            vsv[i] = crust_vs[i]
-            vsh[i] = crust_vs[i]
-
-            # Continental crust
-            if topo[i] >= 0:
-                vpv[i] = 1.5399 * crust_vs[i] + 0.840
-                rho[i] = 0.2277 * crust_vs[i] + 2.016
-
-            # Oceanic crust
-            if topo[i] < 0:
-                vpv[i] = 1.5865 * crust_vs[i] + 0.844
-                rho[i] = 0.2547 * crust_vs[i] + 1.979
-        else:
-            continue
-
-    return rho, vpv, vsv, vsh
-
-
-
 def add_crust_all_params_topo_griddata(cst_zone, crust_dep, crust_vs, topo):
     r_earth = 6371.0
     for i in range(len(cst_zone['r'])):
@@ -179,6 +122,8 @@ def add_crust_all_params_topo_griddata(cst_zone, crust_dep, crust_vs, topo):
                     cst_zone['vpv'].values[i] = 1.5399 * crust_vs[i] + 0.840
                 if 'vph' in cst_zone.columns:
                     cst_zone['vph'].values[i] = 1.5399 * crust_vs[i] + 0.840
+                if 'vp' in cst_zone.columns:
+                    cst_zone['vp'].values[i] = 1.5399 * crust_vs[i] + 0.840
                 if 'rho' in cst_zone.columns:
                     cst_zone['rho'].values[i] = 0.2277 * crust_vs[i] + 2.016
 
@@ -187,6 +132,8 @@ def add_crust_all_params_topo_griddata(cst_zone, crust_dep, crust_vs, topo):
                 if 'vpv' in cst_zone.columns:
                     cst_zone['vpv'].values[i] = 1.5865 * crust_vs[i] + 0.844
                 if 'vph' in cst_zone.columns:
+                    cst_zone['vph'].values[i] = 1.5865 * crust_vs[i] + 0.844
+                if 'vp' in cst_zone.columns:
                     cst_zone['vph'].values[i] = 1.5865 * crust_vs[i] + 0.844
                 if 'rho' in cst_zone.columns:
                     cst_zone['rho'].values[i] = 0.2547 * crust_vs[i] + 1.979

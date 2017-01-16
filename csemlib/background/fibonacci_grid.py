@@ -6,7 +6,7 @@ from csemlib.utils import cart2sph, sph2cart
 
 class FibonacciGrid:
     """
-    A class handling the generation of a Fibonacci grid.
+    Class handling the generation of a Fibonacci grid.
     """
 
 
@@ -24,7 +24,9 @@ class FibonacciGrid:
         :param resolution: array specifying the resolution of these layers in km
         :return:
         """
+
         for i in range(len(radii)):
+            # Add point at (0,0,0) if radius equals zero
             if radii[i] <= np.finfo(float).eps:
                 if self.has_zero_point:
                     continue
@@ -79,7 +81,7 @@ class FibonacciGrid:
 
     def discard_region(self, c_min, c_max, l_min, l_max, r_min, r_max):
         """
-        This function removes a region from the grid
+        This function removes points within a specified region from the grid
         :param c_min: minimum colatitude in radians
         :param c_max: maximum colatitude in radians
         :param l_min: minimum longitude in radians
@@ -91,26 +93,27 @@ class FibonacciGrid:
 
         c, l, r = cart2sph(self._x, self._y, self._z)
         pts = np.array((r, c, l)).T
+
         # Extract r_domain
-        above_domain = pts[pts[:, 0] >= r_max]
-        below_domain = pts[pts[:, 0] <= r_min]
-        r_domain = pts[pts[:, 0] < r_max]
-        r_domain = r_domain[r_domain[:, 0] > r_min]
+        below_domain = pts[pts[:, 0] < r_min]
+        above_domain = pts[pts[:, 0] > r_max]
+        r_domain = pts[pts[:, 0] <= r_max]
+        r_domain = r_domain[r_domain[:, 0] >= r_min]
         # Append points that fall outside of domain
         pts = np.append(above_domain, below_domain, axis=0)
 
         # Extract c_domain
-        below_cmin = r_domain[r_domain[:, 1] <= c_min]
-        above_cmax = r_domain[r_domain[:, 1] >= c_max]
-        c_domain = r_domain[r_domain[:, 1] > c_min]
-        c_domain = c_domain[c_domain[:, 1] < c_max]
+        below_cmin = r_domain[r_domain[:, 1] < c_min]
+        above_cmax = r_domain[r_domain[:, 1] > c_max]
+        c_domain = r_domain[r_domain[:, 1] >= c_min]
+        c_domain = c_domain[c_domain[:, 1] <= c_max]
         # Append points that fall outside of domain
         pts = np.append(pts, below_cmin, axis=0)
         pts = np.append(pts, above_cmax, axis=0)
 
         # Extract l_domain
-        below_lmin = c_domain[c_domain[:, 2] <= l_min]
-        above_lmax = c_domain[c_domain[:, 2] >= l_max]
+        below_lmin = c_domain[c_domain[:, 2] < l_min]
+        above_lmax = c_domain[c_domain[:, 2] > l_max]
         # Append points that fall outside of domain
         pts = np.append(pts, below_lmin, axis=0)
         pts = np.append(pts, above_lmax, axis=0)
@@ -119,13 +122,13 @@ class FibonacciGrid:
 
     def adaptable_fibonacci_sphere(self, n_samples, c_min=0, c_max=np.pi, l_min=0, l_max=2*np.pi):
         """
-        this function computes a regional fibonacci sphere
-        :param n_samples:
-        :param c_min:
-        :param c_max:
-        :param l_min:
-        :param l_max:
-        :return:
+        This function computes a full or regional Fibonacci sphere
+        :param n_samples: Amount of samples on the Fibonaccu sphere
+        :param c_min: min colatitude in radians
+        :param c_max: max colatitude in radians
+        :param l_min: min longitude in radians
+        :param l_max: max longitude in radians
+        :return: x, y, z coordinates
         """
         z_start = math.cos(c_min)
         z_end = math.cos(c_max)
@@ -164,3 +167,5 @@ class FibonacciGrid:
                 return self._x, self._y, self._z
         else:
             raise ValueError('Incorrect type specified in FibonacciGrid.get_coordinates')
+
+

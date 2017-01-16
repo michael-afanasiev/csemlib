@@ -1,6 +1,7 @@
 import datetime
 import io
 import os
+import yaml
 
 import numpy as np
 import xarray
@@ -48,11 +49,9 @@ class Ses3d(Model):
     Class handling file-IO for a model in SES3D format.
     """
 
-    def __init__(self, name, directory, components=[],
-                 rotation_vector=None, rotation_angle=None, doi=None):
+    def __init__(self, name, directory, components=[], doi=None):
         super(Ses3d, self).__init__()
-        self.rot_angle = rotation_angle
-        self.rot_mat = rotation_vector
+        self.rot_mat = None
         self._data = []
         self.directory = directory
         self.components = components
@@ -61,12 +60,21 @@ class Ses3d(Model):
         else:
             self.doi = 'None'
 
+        with io.open(os.path.join(self.directory, 'modelinfo.yml'), 'rt') as fh:
+            try:
+                self.model_info = yaml.load(fh)
+            except yaml.YAMLError as exc:
+                print(exc)
+
+        self.geometry = self.model_info['geometry']
+        self.rot_vec = np.array([self.geometry['rot_x'], self.geometry['rot_y'], self.geometry['rot_z']])
+        self.rot_angle = self.geometry['rot_angle']
+
     @property
     def data(self, region=0):
         return self._data[region]
 
     def read(self):
-
         files = set(os.listdir(self.directory))
         if self.components:
             if not set(self.components).issubset(files):
@@ -122,10 +130,10 @@ class Ses3d(Model):
 
             # Cartesian coordinates and rotation.
             x, y, z = sph2cart(cols.ravel(), lons.ravel(), rads.ravel())
-            if self.rot_mat:
-                if len(self.rot_mat) is not 3:
+            if self.model_info['geometry']['rotation']:
+                if len(self.rot_vec) is not 3:
                     raise ValueError("Rotation matrix must be a 3-vector.")
-                self.rot_mat = _setup_rot_matrix(np.radians(self.rot_angle), *self.rot_mat)
+                self.rot_mat = _setup_rot_matrix(np.radians(self.geometry['rot_angle']), *self.rot_vec)
                 x, y, z = rotate(x, y, z, self.rot_mat)
 
             self._data[i]['x'] = (('col', 'lon', 'rad'), x.reshape((s_col, s_lon, s_rad)))
@@ -203,47 +211,46 @@ class Ses3d(Model):
 
 
     def eval_point_cloud_griddata(self, GridData):
-
-        # Read ModelInfo
-        import yaml
-
-        with io.open(os.path.join(self.directory, 'modelinfo.yml'), 'rt') as fh:
-            try:
-                model_info = yaml.load(fh)
-            except yaml.YAMLError as exc:
-                print(exc)
-
         # Read model
         self.components = GridData.components
         self.read()
 
         # Get dmn
-        ses3d_dmn = extract_ses3d_dmn(GridData, model_info)
+        # Turn off for europe to test
+        ses3d_dmn = self.extract_ses3d_dmn(GridData)
 
         # Interpolate
-        interp = self.eval(ses3d_dmn['x'], ses3d_dmn['y'], ses3d_dmn['z'], self.components)
+        interp = self.eval(ses3d_dmn.df['x'], ses3d_dmn.df['y'], ses3d_dmn.df['z'], self.components)
 
         for i, p in enumerate(self.components):
-            if model_info['component_type'] == 'perturbation':
-                ses3d_dmn[p] = ses3d_dmn[p] * (1 + interp[:, i]/100)
-            elif model_info['component_type'] == 'absolute':
-                ses3d_dmn[p] = interp[:, i]
+            if self.model_info['component_type'] == 'perturbation':
+                ses3d_dmn.df[p] = ses3d_dmn.df[p] * interp[:, i]
+            elif self.model_info['component_type'] == 'absolute':
+                ses3d_dmn.df[p] = interp[:, i]
 
-        GridData.df.update(ses3d_dmn)
+        GridData.df.update(ses3d_dmn.df)
 
         return GridData
 
-def extract_ses3d_dmn(GridData, model_info):
-    if model_info['geometry']['rotation'] is True:
-        raise NotImplementedError('Rotation not implemented yet')
+    def extract_ses3d_dmn(self, GridData):
+        geometry = self.model_info['geometry']
+        ses3d_dmn = GridData.copy()
 
-    geometry = model_info['geometry']
-    ses3d_dmn = GridData.df.copy()
-    ses3d_dmn = ses3d_dmn[ses3d_dmn['c'] >= np.deg2rad(geometry['cmin'])]
-    ses3d_dmn = ses3d_dmn[ses3d_dmn['c'] <= np.deg2rad(geometry['cmax'])]
-    ses3d_dmn = ses3d_dmn[ses3d_dmn['l'] >= np.deg2rad(geometry['lmin'])]
-    ses3d_dmn = ses3d_dmn[ses3d_dmn['l'] <= np.deg2rad(geometry['lmax'])]
-    ses3d_dmn = ses3d_dmn[ses3d_dmn['r'] >= geometry['rmin']]
-    ses3d_dmn = ses3d_dmn[ses3d_dmn['r'] <= geometry['rmax']]
+        # Rotate
+        if geometry['rotation'] is True:
+            ses3d_dmn.rotate(-np.radians(geometry['rot_angle']), geometry['rot_x'],
+                             geometry['rot_y'], geometry['rot_z'])
+        # Extract
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['c'] >= np.deg2rad(geometry['cmin'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['c'] <= np.deg2rad(geometry['cmax'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['l'] >= np.deg2rad(geometry['lmin'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['l'] <= np.deg2rad(geometry['lmax'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= geometry['rmin']]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= geometry['rmax']]
 
-    return ses3d_dmn
+        # Rotate Back
+        if geometry['rotation'] is True:
+            ses3d_dmn.rotate(np.radians(geometry['rot_angle']), geometry['rot_x'],
+                             geometry['rot_y'], geometry['rot_z'])
+
+        return ses3d_dmn

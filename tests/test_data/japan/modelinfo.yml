@@ -6,12 +6,15 @@ geometry:
   lmin: 115.0
   lmax: 160.0
   rotation: False
-  rot_1: 0
-  rot_2: 0
-  rot_3: 0
+  rot_x: 0
+  rot_y: 0
+  rot_z: 0
+  rot_angle: 0
 component_type: perturbation
 components:
   - rho
   - vp
   - vsh
   - vsv
+model: japan_saule
+reference: put_paper_reference_here

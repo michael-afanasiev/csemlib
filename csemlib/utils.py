@@ -43,7 +43,43 @@ def cart2sph(x, y, z):
     return c, l, r
 
 
+def get_rot_matrix(angle, x, y, z):
+    """
+    :param angle: Rotation angle in radians (Right-Hand rule, counterclockwise positive)
+    :param x: x-component of rotational vector
+    :param y: y-component of rotational vector
+    :param z: z-component of rotational vector
+    :return: Rotational Matrix
+    """
+    # Normalize vector.
+    norm = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+    x /= norm
+    y /= norm
+    z /= norm
+
+    # Setup matrix components.
+    matrix = np.empty((3, 3))
+    matrix[0, 0] = np.cos(angle) + (x ** 2) * (1 - np.cos(angle))
+    matrix[1, 0] = z * np.sin(angle) + x * y * (1 - np.cos(angle))
+    matrix[2, 0] = (-1) * y * np.sin(angle) + x * z * (1 - np.cos(angle))
+    matrix[0, 1] = x * y * (1 - np.cos(angle)) - z * np.sin(angle)
+    matrix[1, 1] = np.cos(angle) + (y ** 2) * (1 - np.cos(angle))
+    matrix[2, 1] = x * np.sin(angle) + y * z * (1 - np.cos(angle))
+    matrix[0, 2] = y * np.sin(angle) + x * z * (1 - np.cos(angle))
+    matrix[1, 2] = (-1) * x * np.sin(angle) + y * z * (1 - np.cos(angle))
+    matrix[2, 2] = np.cos(angle) + (z * z) * (1 - np.cos(angle))
+
+    return matrix
+
 def rotate(x, y, z, matrix):
+    """
+
+    :param x: x-coordinates to be rotated
+    :param y: y-coordinates to be rotated
+    :param z: z-coordinates to be rotated
+    :param matrix: Rotational matrix obtained from get_rot_matrix
+    :return: Rotated x,y,z coordinates
+    """
 
     x, y, z = np.asarray(x), np.asarray(y), np.asarray(z)
     return matrix.dot(np.array([x, y, z]))

@@ -157,7 +157,7 @@ def test_ses3d():
     """
 
     mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
-                    components=['drho', 'dvsv', 'dvsh', 'dvp'])
+                    components=['rho', 'vsv', 'vsh', 'vp'])
     mod.read()
 
     all_cols, all_lons, all_rads = np.meshgrid(
@@ -165,13 +165,13 @@ def test_ses3d():
         mod.data.coords['lon'].values,
         mod.data.coords['rad'].values)
     interp = mod.eval(mod.data['x'].values.ravel(), mod.data['y'].values.ravel(),
-                      mod.data['z'].values.ravel(), param=['dvsv', 'drho', 'dvsh', 'dvp'])
+                      mod.data['z'].values.ravel(), param=['vsv', 'rho', 'vsh', 'vp'])
     # Setup true data.
     true = np.empty((len(all_cols.ravel()), 4))
-    true[:, 0] = mod.data['dvsv'].values.ravel()
-    true[:, 1] = mod.data['drho'].values.ravel()
-    true[:, 2] = mod.data['dvsh'].values.ravel()
-    true[:, 3] = mod.data['dvp'].values.ravel()
+    true[:, 0] = mod.data['vsv'].values.ravel()
+    true[:, 1] = mod.data['rho'].values.ravel()
+    true[:, 2] = mod.data['vsh'].values.ravel()
+    true[:, 3] = mod.data['vp'].values.ravel()
 
     np.testing.assert_almost_equal(true, interp, decimal=DECIMAL_CLOSE)
 
@@ -213,7 +213,7 @@ def test_s20rts():
     cols, lons = np.meshgrid(col, lon)
     rad = mod.layers[0]
 
-    vals = mod.eval(cols, lons, rad, 'test').reshape(size, size).T
+    vals = mod.eval(cols, lons, rad).reshape(size, size).T
     dat = xarray.DataArray(vals, dims=['lat', 'lon'], coords=[90 - np.degrees(col), np.degrees(lon)])
     np.testing.assert_almost_equal(dat.values, true, decimal=DECIMAL_CLOSE)
 
@@ -231,7 +231,7 @@ def test_s20rts_vtk_single_sphere():
     rel_rad = rad/ s20mod.r_earth
     x, y, z = skl.fibonacci_sphere(500)
     c, l, _ = cart2sph(x, y, z)
-    vals = s20mod.eval(c, l, rad, 'test')
+    vals = s20mod.eval(c, l, rad)
 
     elements = triangulate(x,y,z)
 
@@ -249,7 +249,7 @@ def test_s20rts_out_of_bounds():
         mod.find_layer_idx(6204)
 
     with pytest.raises(ValueError):
-        mod.eval(0, 0, 7000, 'test')
+        mod.eval(0, 0, 7000)
 
 def test_add_crust_to_prem():
     # Generate point cloud

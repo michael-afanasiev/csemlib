@@ -166,7 +166,7 @@ def prem_no220_no_regions(rad):
         vsv = vsh = 3.6678 - 4.4475 * x * x
         return rho, vpv, vsv, vsh
 
-    # This should never happen in theory
+    # This should never happen
     elif rad < 0:
         raise ValueError('Negative radius specified for 1D_prem')
 
@@ -176,6 +176,7 @@ def prem_eval_point_cloud(rad):
     :param rad: distance from core in kom
     :return rho, vpv, vsv, vsh:
     """
+    print('Evaluating PREM')
     g = np.vectorize(prem_no220_no_regions)
     rho, vpv, vsv, vsh = g(rad)
     return rho, vpv, vsv, vsh
