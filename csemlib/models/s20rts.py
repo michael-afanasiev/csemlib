@@ -146,8 +146,8 @@ class S20rts(Model):
                     chunk = chunk[chunk['r'] >= lower_rad]
 
                 # Evaluate S20RTS at upper and lower end of chunk, use these to interpolate
-                top_vals = self.eval(chunk['c'], chunk['l'], upper_rad, 'test')
-                bottom_vals = self.eval(chunk['c'], chunk['l'], lower_rad, 'test')
+                top_vals = self.eval(chunk['c'], chunk['l'], upper_rad)
+                bottom_vals = self.eval(chunk['c'], chunk['l'], lower_rad)
 
                 # Interpolate
                 chunk_vals = self.linear_interpolation(bottom_vals, top_vals, lower_rad, upper_rad, chunk['r'])

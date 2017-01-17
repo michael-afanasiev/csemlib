@@ -19,13 +19,12 @@ class Ses3d_rbf(Ses3d):
     Class built open Ses3D which adds extra interpolation methods
     """
 
-    def __init__(self, name, directory, components=[], doi=None, interp_method='nearest neighbour'):
+    def __init__(self, name, directory, components=[], doi=None, interp_method='nearest_neighbour'):
         super(Ses3d_rbf, self).__init__(name, directory, components, doi)
         self.read()
         self.grid_data_ses3d = GridData()
         self.init_grid_data()
         self.interp_method = interp_method
-        self.model_type = 'perturbation_percent'
 
     def split_domain(self, GridData):
         ses3d_pts = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
@@ -75,7 +74,10 @@ class Ses3d_rbf(Ses3d):
         if self.interp_method == 'nearest_neighbour':
             _, indices = pnt_tree_orig.query(ses3d_dmn.get_coordinates(coordinate_type='cartesian'), k=1)
             for component in self.components:
-                ses3d_dmn.df[:][component] = self.grid_data_ses3d.df['r'][indices].values
+                if self.model_info['component_type'] == 'perturbation':
+                    ses3d_dmn.df[:][component] += self.grid_data_ses3d.df[component][indices].values
+                if self.model_info['component_type'] == 'absolute':
+                    ses3d_dmn.df[:][component] += self.grid_data_ses3d.df[component][indices].values
 
             GridData.df.update(ses3d_dmn.df)
             return
@@ -100,9 +102,9 @@ class Ses3d_rbf(Ses3d):
                     rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig, function='linear')
                     val = rbfi(x_c_new, y_c_new, z_c_new)
 
-                if self.model_type == 'perturbation_percent':
+                if self.model_info['component_type'] == 'perturbation':
                     ses3d_dmn.df[component].values[i] += val
-                elif self.model_type == 'absolute':
+                elif self.model_info['component_type'] == 'absolute':
                     ses3d_dmn.df[component].values[i] = val
             i += 1
 

@@ -11,6 +11,8 @@ import csemlib.models.crust as crust
 import csemlib.models.one_dimensional as m1d
 import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
+from csemlib.background.fibonacci_grid import FibonacciGrid
+from csemlib.background.grid_data import GridData
 from csemlib.models.model import triangulate, write_vtk
 from csemlib.models.topography import Topography
 from csemlib.utils import cart2sph, sph2cart
@@ -251,63 +253,39 @@ def test_s20rts_out_of_bounds():
     with pytest.raises(ValueError):
         mod.eval(0, 0, 7000)
 
-def test_add_crust_to_prem():
-    # Generate point cloud
-    n_samples = 20
-    n_layers = 10
-    radii = np.linspace(6371.0, 0.0, n_layers)
-
-    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
-    c, l, r = cart2sph(x, y, z)
-
-    # Evaluate Prem
-    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
-    pts = np.array((c, l, r, rho, vpv, vsv, vsh))
-
-    # Evaluate crust
-    cst = crust.Crust()
-    pts = cst.eval_point_cloud(*pts)
-
-    # Generate mesh for plotting
-    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/6371.0)
-    elements = triangulate(x, y, z)
-
-    # Write to vtk
-    coords = np.array((x, y, z)).T
-    write_vtk(os.path.join(VTK_DIR, 'crust_vsv.vtk'), coords, elements, pts[:, 5], 'vsv')
-
 def test_add_crust_and_s20rts_prem():
     """
     Test where both s20rts and the crust with topography are added to prem.
     """
 
     # Generate point cloud based on average distance to the next point
-    num_layers = 20
-    radii = np.linspace(6371.0, 0.0, num_layers)
-    r_earth = 6371.0
-    res = r_earth / num_layers
+    fib_grid = FibonacciGrid()
+    # Set global background grid
+    radii = np.linspace(6371.0, 0.0, 10)
+    resolution = np.ones_like(radii) * (6371.0 - 0.0) / 10
+    fib_grid.set_global_sphere(radii, resolution)
 
-    x, y, z = skl.multiple_fibonacci_resolution(radii, resolution=res, min_samples=10)
-    c, l, r = cart2sph(x, y, z)
+    grid_data = GridData(*fib_grid.get_coordinates())
 
     # Evaluate Prem
-    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
-    pts = np.array((c, l, r, rho, vpv, vsv, vsh))
+    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(grid_data.df['r'])
+    grid_data.set_component('vsv', vsv)
 
     # Evaluate s20rts
     s20mod = s20.S20rts()
-    pts = s20mod.eval_point_cloud(*pts)
+    s20mod.eval_point_cloud_griddata(grid_data)
 
+    # Evaluate Crust
     cst = crust.Crust()
-    pts = cst.eval_point_cloud(*pts.T)
+    pts = cst.eval_point_cloud_grid_data(grid_data)
 
     # Generate mesh for plotting (normalised coordinates)
-    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/ r_earth)
+    x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
     elements = triangulate(x, y, z)
     coords = np.array((x, y, z)).T
 
     # Write to vtk
-    write_vtk(os.path.join(VTK_DIR, 'crust_vsv.vtk'), coords, elements, pts[:, 5], 'vsv')
+    write_vtk(os.path.join(VTK_DIR, 'prem_crust_vsv.vtk'), coords, elements, grid_data.get_component('vsv'), 'vsv')
 
 def test_topo():
     """
