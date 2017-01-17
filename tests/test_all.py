@@ -152,32 +152,6 @@ def test_barycenter_detection():
     np.testing.assert_almost_equal(ind, true_ind, decimal=DECIMAL_CLOSE)
     np.testing.assert_almost_equal(bary, true_bar, decimal=DECIMAL_CLOSE)
 
-
-def test_ses3d():
-    """
-    Test to ensure that a ses3d model returns itself.
-    """
-
-    mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
-                    components=['rho', 'vsv', 'vsh', 'vp'])
-    mod.read()
-
-    all_cols, all_lons, all_rads = np.meshgrid(
-        mod.data.coords['col'].values,
-        mod.data.coords['lon'].values,
-        mod.data.coords['rad'].values)
-    interp = mod.eval(mod.data['x'].values.ravel(), mod.data['y'].values.ravel(),
-                      mod.data['z'].values.ravel(), param=['vsv', 'rho', 'vsh', 'vp'])
-    # Setup true data.
-    true = np.empty((len(all_cols.ravel()), 4))
-    true[:, 0] = mod.data['vsv'].values.ravel()
-    true[:, 1] = mod.data['rho'].values.ravel()
-    true[:, 2] = mod.data['vsh'].values.ravel()
-    true[:, 3] = mod.data['vp'].values.ravel()
-
-    np.testing.assert_almost_equal(true, interp, decimal=DECIMAL_CLOSE)
-
-
 def test_s20rts():
     """
     Test to ensure that s20 rts calls returns some proper values.

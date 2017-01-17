@@ -70,7 +70,6 @@ class Ses3d(Model):
         self.rot_vec = np.array([self.geometry['rot_x'], self.geometry['rot_y'], self.geometry['rot_z']])
         self.rot_angle = self.geometry['rot_angle']
 
-    @property
     def data(self, region=0):
         return self._data[region]
 
