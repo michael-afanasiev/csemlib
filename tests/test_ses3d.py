@@ -12,6 +12,8 @@ from csemlib.models.one_dimensional import prem_eval_point_cloud
 from csemlib.models.s20rts import S20rts
 from csemlib.models.ses3d_rbf import Ses3d_rbf
 from csemlib.utils import cart2sph
+import shutil
+from boltons import fileutils
 
 TEST_DATA_DIR = os.path.join(os.path.split(__file__)[0], 'test_data')
 VTK_DIR = os.path.join(os.path.split(__file__)[0], 'vtk')
@@ -90,6 +92,45 @@ def test_ses3d_multi_region_read():
             rtol=1e-4, atol=0.0)
 
 
+def test_ses3d_multi_region_write():
+    """
+    Test to ensure that a multi-region ses3d file gets written properly.
+    We read in a dummy file with 3 regions and vsv defined in each regions.
+    Check to make sure values from each region make sense.
+    """
+
+    mod = s3d.Ses3d('MultiRegion', os.path.join(os.path.join(TEST_DATA_DIR,
+        'multi_region_ses3d')), components=['vsv'])
+    mod.read()
+
+    # Make test dir and write.
+    fileutils.mkdir_p(os.path.join(TEST_DATA_DIR, 'multi_region'))
+    mod.write(os.path.join(TEST_DATA_DIR, 'multi_region'))
+
+    new_write_dir = os.path.join(TEST_DATA_DIR, 'multi_region')
+    test_dir = os.path.join(TEST_DATA_DIR, 'multi_region_ses3d')
+
+    # Ensure values are the same.
+    new = np.loadtxt(os.path.join(new_write_dir, 'block_x'))
+    old = np.loadtxt(os.path.join(test_dir, 'block_x'))
+    np.testing.assert_allclose(new, old, rtol=1e-2, atol=0.0)
+
+    new = np.loadtxt(os.path.join(new_write_dir, 'block_y'))
+    old = np.loadtxt(os.path.join(test_dir, 'block_y'))
+    np.testing.assert_allclose(new, old, rtol=1e-2, atol=0.0)
+
+    new = np.loadtxt(os.path.join(new_write_dir, 'block_z'))
+    old = np.loadtxt(os.path.join(test_dir, 'block_z'))
+    np.testing.assert_allclose(new, old, rtol=1e-2, atol=0.0)
+
+    new = np.loadtxt(os.path.join(new_write_dir, 'vsv'))
+    old = np.loadtxt(os.path.join(test_dir, 'vsv'))
+    np.testing.assert_allclose(new, old, rtol=1e-2, atol=0.0)
+
+    # Clean up directory.
+    shutil.rmtree(new_write_dir)
+
+
 def test_ses3d():
     """
     Test to ensure that a ses3d model returns itself.
@@ -100,17 +141,17 @@ def test_ses3d():
     mod.read()
 
     all_cols, all_lons, all_rads = np.meshgrid(
-        mod.data.coords['col'].values,
-        mod.data.coords['lon'].values,
-        mod.data.coords['rad'].values)
-    interp = mod.eval(mod.data['x'].values.ravel(), mod.data['y'].values.ravel(),
-                      mod.data['z'].values.ravel(), param=['vsv', 'rho', 'vsh', 'vp'])
+        mod.data().coords['col'].values,
+        mod.data().coords['lon'].values,
+        mod.data().coords['rad'].values)
+    interp = mod.eval(mod.data()['x'].values.ravel(), mod.data()['y'].values.ravel(),
+                      mod.data()['z'].values.ravel(), param=['vsv', 'rho', 'vsh', 'vp'])
     # Setup true data.
     true = np.empty((len(all_cols.ravel()), 4))
-    true[:, 0] = mod.data['vsv'].values.ravel()
-    true[:, 1] = mod.data['rho'].values.ravel()
-    true[:, 2] = mod.data['vsh'].values.ravel()
-    true[:, 3] = mod.data['vp'].values.ravel()
+    true[:, 0] = mod.data()['vsv'].values.ravel()
+    true[:, 1] = mod.data()['rho'].values.ravel()
+    true[:, 2] = mod.data()['vsh'].values.ravel()
+    true[:, 3] = mod.data()['vp'].values.ravel()
 
     np.testing.assert_almost_equal(true, interp, decimal=DECIMAL_CLOSE)
 

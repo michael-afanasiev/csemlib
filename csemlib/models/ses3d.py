@@ -52,6 +52,7 @@ class Ses3d(Model):
     def __init__(self, name, directory, components=[], doi=None):
         super(Ses3d, self).__init__()
         self.rot_mat = None
+        self._disc = []
         self._data = []
         self.directory = directory
         self.components = components
@@ -94,6 +95,11 @@ class Ses3d(Model):
 
         # Get centers of boxes.
         for i, _ in enumerate(col_regions):
+            discretizations = {
+                    'col': (col_regions[i][1] - col_regions[i][0]) / 2.0,
+                    'lon': (lon_regions[i][1] - lon_regions[i][0]) / 2.0,
+                    'rad': (rad_regions[i][1] - rad_regions[i][0]) / 2.0}
+            self._disc.append(discretizations)
             col_regions[i] = 0.5 * (col_regions[i][1:] + col_regions[i][:-1])
             lon_regions[i] = 0.5 * (lon_regions[i][1:] + lon_regions[i][:-1])
             rad_regions[i] = 0.5 * (rad_regions[i][1:] + rad_regions[i][:-1])
@@ -154,18 +160,31 @@ class Ses3d(Model):
 
         for block, comp in zip(['block_x', 'block_y', 'block_z'], ['col', 'lon', 'rad']):
             with io.open(os.path.join(directory, block), 'w') as fh:
-                fh.write("1\n")
-                fh.write(str(len(self.data.coords[comp].values)) + "\n")
-                if block in ['block_x', 'block_y']:
-                    fh.write('\n'.join([str(num) for num in np.degrees(self.data.coords[comp].values)]))
-                else:
-                    fh.write('\n'.join([str(num) for num in self.data.coords[comp].values]))
+                fh.write(str(len(self._data)) + "\n")
+                for region in range(len(self._data)):
+                    fh.write(str(len(self._data[region].coords[comp].values) + 1) + "\n")
+                    if block in ['block_x', 'block_y']:
+                        fh.write('\n'.join([str(num) for num in
+                            np.degrees(self._data[region].coords[comp].values) -
+                                self._disc[region][comp]]))
+                        fh.write("\n" + str(np.degrees(self._data[region].coords[comp].values[-1])
+                            + self._disc[region][comp]))
+                    else:
+                        fh.write('\n'.join([str(num) for num in
+                            self._data[region].coords[comp].values -
+                            self._disc[region][comp]]))
+                        fh.write("\n" +
+                                str(self._data[region].coords[comp].values[-1]
+                                + self._disc[region][comp]))
+                    fh.write("\n")
 
         for par in self.components:
             with io.open(os.path.join(directory, par), 'w') as fh:
-                fh.write("1\n")
-                fh.write(str(len(self.data[par].values.ravel())) + "\n")
-                fh.write('\n'.join([str(num) for num in self.data[par].values.ravel()]))
+                fh.write(str(len(self._data)) + "\n")
+                for region in range(len(self._data)):
+                    fh.write(str(len(self._data[region][par].values.ravel())) + "\n")
+                    fh.write('\n'.join([str(num) for num in self._data[region][par].values.ravel()]))
+                    fh.write("\n")
 
     def eval(self, x, y, z, param=None, region=0):
         """
@@ -199,12 +218,13 @@ class Ses3d(Model):
 
         # Get interpolating functions. Map cartesian coordinates for the interpolation.
         interp_param = []
-        indices, barycentric_coordinates = shade(x, y, z, self.data['x'].values.ravel(),
-                                                 self.data['y'].values.ravel(), self.data['z'].values.ravel(),
+        indices, barycentric_coordinates = shade(x, y, z, self._data[region]['x'].values.ravel(),
+                                                 self._data[region]['y'].values.ravel(),
+                                                 self._data[region]['z'].values.ravel(),
                                                  elements)
         for i, p in enumerate(param):
             interp_param.append(np.array(
-                interpolate(indices, barycentric_coordinates, self.data[p].values.ravel()), dtype=np.float64))
+                interpolate(indices, barycentric_coordinates, self._data[region][p].values.ravel()), dtype=np.float64))
 
         return np.array(interp_param).T
 
