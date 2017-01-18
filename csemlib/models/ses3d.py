@@ -114,7 +114,7 @@ class Ses3d(Model):
                 val_regions[i] = val_regions[i].reshape((len(col_regions[i]), len(lon_regions[i]),
                                                          len(rad_regions[i])))
                 if not self._data:
-                    self._data = [xarray.Dataset() for i in range(len(val_regions))]
+                    self._data = [xarray.Dataset() for j in range(len(val_regions))]
 
                 self._data[i][p] = (('col', 'lon', 'rad'), val_regions[i])
                 if 'rho' in p:
@@ -159,32 +159,34 @@ class Ses3d(Model):
     def write(self, directory):
 
         for block, comp in zip(['block_x', 'block_y', 'block_z'], ['col', 'lon', 'rad']):
-            with io.open(os.path.join(directory, block), 'w') as fh:
-                fh.write(str(len(self._data)) + "\n")
+            with io.open(os.path.join(directory, block), 'wt') as fh:
+                fh.write(str(len(self._data)) + u"\n")
                 for region in range(len(self._data)):
-                    fh.write(str(len(self._data[region].coords[comp].values) + 1) + "\n")
+                    fh.write(str(len(self._data[region].coords[comp].values) +
+                        1) + u"\n")
                     if block in ['block_x', 'block_y']:
-                        fh.write('\n'.join([str(num) for num in
+                        fh.write(u'\n'.join([str(num) for num in
                             np.degrees(self._data[region].coords[comp].values) -
                                 self._disc[region][comp]]))
-                        fh.write("\n" + str(np.degrees(self._data[region].coords[comp].values[-1])
+                        fh.write(u"\n" + str(np.degrees(self._data[region].coords[comp].values[-1])
                             + self._disc[region][comp]))
                     else:
-                        fh.write('\n'.join([str(num) for num in
+                        fh.write(u'\n'.join([str(num) for num in
                             self._data[region].coords[comp].values -
                             self._disc[region][comp]]))
-                        fh.write("\n" +
+                        fh.write(u"\n" +
                                 str(self._data[region].coords[comp].values[-1]
                                 + self._disc[region][comp]))
-                    fh.write("\n")
+                    fh.write(u"\n")
 
         for par in self.components:
-            with io.open(os.path.join(directory, par), 'w') as fh:
-                fh.write(str(len(self._data)) + "\n")
+            with io.open(os.path.join(directory, par), 'wt') as fh:
+                fh.write(str(len(self._data)) + u"\n")
                 for region in range(len(self._data)):
-                    fh.write(str(len(self._data[region][par].values.ravel())) + "\n")
-                    fh.write('\n'.join([str(num) for num in self._data[region][par].values.ravel()]))
-                    fh.write("\n")
+                    fh.write(str(len(self._data[region][par].values.ravel())) +
+                            u"\n")
+                    fh.write(u'\n'.join([str(num) for num in self._data[region][par].values.ravel()]))
+                    fh.write(u"\n")
 
     def eval(self, x, y, z, param=None, region=0):
         """
