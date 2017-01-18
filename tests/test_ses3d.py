@@ -20,7 +20,7 @@ VTK_DIR = os.path.join(os.path.split(__file__)[0], 'vtk')
 DECIMAL_CLOSE = 3
 
 
-def test_ses3d():
+def test_ses3d_griddata():
 
     #  Generate visualisation grid
     fib_grid = FibonacciGrid()

@@ -51,13 +51,13 @@ class Ses3d_rbf(Ses3d):
 
 
     def init_grid_data(self):
-        x = self.data['x'].values.ravel()
-        y = self.data['y'].values.ravel()
-        z = self.data['z'].values.ravel()
+        x = self.data()['x'].values.ravel()
+        y = self.data()['y'].values.ravel()
+        z = self.data()['z'].values.ravel()
         self.grid_data_ses3d = GridData(x, y, z, components=self.components)
 
         for component in self.components:
-            self.grid_data_ses3d.set_component(component, self.data[component].values.ravel())
+            self.grid_data_ses3d.set_component(component, self.data()[component].values.ravel())
 
 
     def eval_point_cloud_griddata(self, GridData):
