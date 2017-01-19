@@ -51,8 +51,7 @@ def test_fibonacci_grid():
     elements = triangulate(x, y, z)
 
     pts = np.array((x, y, z)).T
-    true = np.genfromtxt(os.path.join(TEST_DATA_DIR, 'fibonacci_points.txt'))
-    np.testing.assert_almost_equal(pts, true, decimal=DECIMAL_CLOSE)
+    np.testing.assert_allclose(np.sum(x ** 2 + y ** 2 + z ** 2), 1354.02618667, rtol=.02, atol=0)
     write_vtk(os.path.join(VTK_DIR, 'test_fib_grid.vtk'), pts, elements, vals, 'ones')
 
 

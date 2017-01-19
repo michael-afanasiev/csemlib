@@ -1,6 +1,7 @@
 import datetime
 import io
 import os
+import yaml
 
 import numpy as np
 import xarray
@@ -48,11 +49,10 @@ class Ses3d(Model):
     Class handling file-IO for a model in SES3D format.
     """
 
-    def __init__(self, name, directory, components=[],
-                 rotation_vector=None, rotation_angle=None, doi=None):
+    def __init__(self, name, directory, components=[], doi=None):
         super(Ses3d, self).__init__()
-        self.rot_angle = rotation_angle
-        self.rot_mat = rotation_vector
+        self.rot_mat = None
+        self._disc = []
         self._data = []
         self.directory = directory
         self.components = components
@@ -61,12 +61,20 @@ class Ses3d(Model):
         else:
             self.doi = 'None'
 
-    @property
+        with io.open(os.path.join(self.directory, 'modelinfo.yml'), 'rt') as fh:
+            try:
+                self.model_info = yaml.load(fh)
+            except yaml.YAMLError as exc:
+                print(exc)
+
+        self.geometry = self.model_info['geometry']
+        self.rot_vec = np.array([self.geometry['rot_x'], self.geometry['rot_y'], self.geometry['rot_z']])
+        self.rot_angle = self.geometry['rot_angle']
+
     def data(self, region=0):
         return self._data[region]
 
     def read(self):
-
         files = set(os.listdir(self.directory))
         if self.components:
             if not set(self.components).issubset(files):
@@ -87,6 +95,11 @@ class Ses3d(Model):
 
         # Get centers of boxes.
         for i, _ in enumerate(col_regions):
+            discretizations = {
+                    'col': (col_regions[i][1] - col_regions[i][0]) / 2.0,
+                    'lon': (lon_regions[i][1] - lon_regions[i][0]) / 2.0,
+                    'rad': (rad_regions[i][1] - rad_regions[i][0]) / 2.0}
+            self._disc.append(discretizations)
             col_regions[i] = 0.5 * (col_regions[i][1:] + col_regions[i][:-1])
             lon_regions[i] = 0.5 * (lon_regions[i][1:] + lon_regions[i][:-1])
             rad_regions[i] = 0.5 * (rad_regions[i][1:] + rad_regions[i][:-1])
@@ -101,7 +114,7 @@ class Ses3d(Model):
                 val_regions[i] = val_regions[i].reshape((len(col_regions[i]), len(lon_regions[i]),
                                                          len(rad_regions[i])))
                 if not self._data:
-                    self._data = [xarray.Dataset() for i in range(len(val_regions))]
+                    self._data = [xarray.Dataset() for j in range(len(val_regions))]
 
                 self._data[i][p] = (('col', 'lon', 'rad'), val_regions[i])
                 if 'rho' in p:
@@ -122,10 +135,10 @@ class Ses3d(Model):
 
             # Cartesian coordinates and rotation.
             x, y, z = sph2cart(cols.ravel(), lons.ravel(), rads.ravel())
-            if self.rot_mat:
-                if len(self.rot_mat) is not 3:
+            if self.model_info['geometry']['rotation']:
+                if len(self.rot_vec) is not 3:
                     raise ValueError("Rotation matrix must be a 3-vector.")
-                self.rot_mat = _setup_rot_matrix(np.radians(self.rot_angle), *self.rot_mat)
+                self.rot_mat = _setup_rot_matrix(np.radians(self.geometry['rot_angle']), *self.rot_vec)
                 x, y, z = rotate(x, y, z, self.rot_mat)
 
             self._data[i]['x'] = (('col', 'lon', 'rad'), x.reshape((s_col, s_lon, s_rad)))
@@ -146,19 +159,34 @@ class Ses3d(Model):
     def write(self, directory):
 
         for block, comp in zip(['block_x', 'block_y', 'block_z'], ['col', 'lon', 'rad']):
-            with io.open(os.path.join(directory, block), 'w') as fh:
-                fh.write("1\n")
-                fh.write(str(len(self.data.coords[comp].values)) + "\n")
-                if block in ['block_x', 'block_y']:
-                    fh.write('\n'.join([str(num) for num in np.degrees(self.data.coords[comp].values)]))
-                else:
-                    fh.write('\n'.join([str(num) for num in self.data.coords[comp].values]))
+            with io.open(os.path.join(directory, block), 'wt') as fh:
+                fh.write(str(len(self._data)) + u"\n")
+                for region in range(len(self._data)):
+                    fh.write(str(len(self._data[region].coords[comp].values) +
+                        1) + u"\n")
+                    if block in ['block_x', 'block_y']:
+                        fh.write(u'\n'.join([str(num) for num in
+                            np.degrees(self._data[region].coords[comp].values) -
+                                self._disc[region][comp]]))
+                        fh.write(u"\n" + str(np.degrees(self._data[region].coords[comp].values[-1])
+                            + self._disc[region][comp]))
+                    else:
+                        fh.write(u'\n'.join([str(num) for num in
+                            self._data[region].coords[comp].values -
+                            self._disc[region][comp]]))
+                        fh.write(u"\n" +
+                                str(self._data[region].coords[comp].values[-1]
+                                + self._disc[region][comp]))
+                    fh.write(u"\n")
 
         for par in self.components:
-            with io.open(os.path.join(directory, par), 'w') as fh:
-                fh.write("1\n")
-                fh.write(str(len(self.data[par].values.ravel())) + "\n")
-                fh.write('\n'.join([str(num) for num in self.data[par].values.ravel()]))
+            with io.open(os.path.join(directory, par), 'wt') as fh:
+                fh.write(str(len(self._data)) + u"\n")
+                for region in range(len(self._data)):
+                    fh.write(str(len(self._data[region][par].values.ravel())) +
+                            u"\n")
+                    fh.write(u'\n'.join([str(num) for num in self._data[region][par].values.ravel()]))
+                    fh.write(u"\n")
 
     def eval(self, x, y, z, param=None, region=0):
         """
@@ -192,11 +220,58 @@ class Ses3d(Model):
 
         # Get interpolating functions. Map cartesian coordinates for the interpolation.
         interp_param = []
-        indices, barycentric_coordinates = shade(x, y, z, self.data['x'].values.ravel(),
-                                                 self.data['y'].values.ravel(), self.data['z'].values.ravel(),
+        indices, barycentric_coordinates = shade(x, y, z, self._data[region]['x'].values.ravel(),
+                                                 self._data[region]['y'].values.ravel(),
+                                                 self._data[region]['z'].values.ravel(),
                                                  elements)
         for i, p in enumerate(param):
             interp_param.append(np.array(
-                interpolate(indices, barycentric_coordinates, self.data[p].values.ravel()), dtype=np.float64))
+                interpolate(indices, barycentric_coordinates, self._data[region][p].values.ravel()), dtype=np.float64))
 
         return np.array(interp_param).T
+
+
+    def eval_point_cloud_griddata(self, GridData):
+        # Read model
+        self.components = GridData.components
+        self.read()
+
+        # Get dmn
+        # Turn off for europe to test
+        ses3d_dmn = self.extract_ses3d_dmn(GridData)
+
+        # Interpolate
+        interp = self.eval(ses3d_dmn.df['x'], ses3d_dmn.df['y'], ses3d_dmn.df['z'], self.components)
+
+        for i, p in enumerate(self.components):
+            if self.model_info['component_type'] == 'perturbation':
+                ses3d_dmn.df[p] += interp[:, i]
+            elif self.model_info['component_type'] == 'absolute':
+                ses3d_dmn.df[p] = interp[:, i]
+
+        GridData.df.update(ses3d_dmn.df)
+
+        return GridData
+
+    def extract_ses3d_dmn(self, GridData):
+        geometry = self.model_info['geometry']
+        ses3d_dmn = GridData.copy()
+
+        # Rotate
+        if geometry['rotation'] is True:
+            ses3d_dmn.rotate(-np.radians(geometry['rot_angle']), geometry['rot_x'],
+                             geometry['rot_y'], geometry['rot_z'])
+        # Extract
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['c'] >= np.deg2rad(geometry['cmin'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['c'] <= np.deg2rad(geometry['cmax'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['l'] >= np.deg2rad(geometry['lmin'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['l'] <= np.deg2rad(geometry['lmax'])]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= geometry['rmin']]
+        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= geometry['rmax']]
+
+        # Rotate Back
+        if geometry['rotation'] is True:
+            ses3d_dmn.rotate(np.radians(geometry['rot_angle']), geometry['rot_x'],
+                             geometry['rot_y'], geometry['rot_z'])
+
+        return ses3d_dmn

@@ -11,6 +11,8 @@ import csemlib.models.crust as crust
 import csemlib.models.one_dimensional as m1d
 import csemlib.models.s20rts as s20
 import csemlib.models.ses3d as s3d
+from csemlib.background.fibonacci_grid import FibonacciGrid
+from csemlib.background.grid_data import GridData
 from csemlib.models.model import triangulate, write_vtk
 from csemlib.models.topography import Topography
 from csemlib.utils import cart2sph, sph2cart
@@ -150,32 +152,6 @@ def test_barycenter_detection():
     np.testing.assert_almost_equal(ind, true_ind, decimal=DECIMAL_CLOSE)
     np.testing.assert_almost_equal(bary, true_bar, decimal=DECIMAL_CLOSE)
 
-
-def test_ses3d():
-    """
-    Test to ensure that a ses3d model returns itself.
-    """
-
-    mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
-                    components=['drho', 'dvsv', 'dvsh', 'dvp'])
-    mod.read()
-
-    all_cols, all_lons, all_rads = np.meshgrid(
-        mod.data.coords['col'].values,
-        mod.data.coords['lon'].values,
-        mod.data.coords['rad'].values)
-    interp = mod.eval(mod.data['x'].values.ravel(), mod.data['y'].values.ravel(),
-                      mod.data['z'].values.ravel(), param=['dvsv', 'drho', 'dvsh', 'dvp'])
-    # Setup true data.
-    true = np.empty((len(all_cols.ravel()), 4))
-    true[:, 0] = mod.data['dvsv'].values.ravel()
-    true[:, 1] = mod.data['drho'].values.ravel()
-    true[:, 2] = mod.data['dvsh'].values.ravel()
-    true[:, 3] = mod.data['dvp'].values.ravel()
-
-    np.testing.assert_almost_equal(true, interp, decimal=DECIMAL_CLOSE)
-
-
 def test_s20rts():
     """
     Test to ensure that s20 rts calls returns some proper values.
@@ -213,7 +189,7 @@ def test_s20rts():
     cols, lons = np.meshgrid(col, lon)
     rad = mod.layers[0]
 
-    vals = mod.eval(cols, lons, rad, 'test').reshape(size, size).T
+    vals = mod.eval(cols, lons, rad).reshape(size, size).T
     dat = xarray.DataArray(vals, dims=['lat', 'lon'], coords=[90 - np.degrees(col), np.degrees(lon)])
     np.testing.assert_almost_equal(dat.values, true, decimal=DECIMAL_CLOSE)
 
@@ -230,8 +206,8 @@ def test_s20rts_vtk_single_sphere():
     rad = s20mod.layers[0]
     rel_rad = rad/ s20mod.r_earth
     x, y, z = skl.fibonacci_sphere(500)
-    _, c, l = cart2sph(x, y, z)
-    vals = s20mod.eval(c, l, rad, 'test')
+    c, l, _ = cart2sph(x, y, z)
+    vals = s20mod.eval(c, l, rad)
 
     elements = triangulate(x,y,z)
 
@@ -249,32 +225,7 @@ def test_s20rts_out_of_bounds():
         mod.find_layer_idx(6204)
 
     with pytest.raises(ValueError):
-        mod.eval(0, 0, 7000, 'test')
-
-def test_add_crust_to_prem():
-    # Generate point cloud
-    n_samples = 20
-    n_layers = 10
-    radii = np.linspace(6371.0, 0.0, n_layers)
-
-    x, y, z = skl.multiple_fibonacci_spheres(radii, n_samples, normalized_radius=False)
-    r, c, l = cart2sph(x, y, z)
-
-    # Evaluate Prem
-    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
-    pts = np.array((c, l, r, rho, vpv, vsv, vsh))
-
-    # Evaluate crust
-    cst = crust.Crust()
-    pts = cst.eval_point_cloud(*pts)
-
-    # Generate mesh for plotting
-    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/6371.0)
-    elements = triangulate(x, y, z)
-
-    # Write to vtk
-    coords = np.array((x, y, z)).T
-    write_vtk(os.path.join(VTK_DIR, 'crust_vsv.vtk'), coords, elements, pts[:, 5], 'vsv')
+        mod.eval(0, 0, 7000)
 
 def test_add_crust_and_s20rts_prem():
     """
@@ -282,32 +233,33 @@ def test_add_crust_and_s20rts_prem():
     """
 
     # Generate point cloud based on average distance to the next point
-    num_layers = 10
-    radii = np.linspace(6371.0, 0.0, num_layers)
-    r_earth = 6371.0
-    res = r_earth / num_layers
+    fib_grid = FibonacciGrid()
+    # Set global background grid
+    radii = np.linspace(6371.0, 0.0, 10)
+    resolution = np.ones_like(radii) * (6371.0 - 0.0) / 10
+    fib_grid.set_global_sphere(radii, resolution)
 
-    x, y, z = skl.multiple_fibonacci_resolution(radii, resolution=res, min_samples=10)
-    r, c, l = cart2sph(x, y, z)
+    grid_data = GridData(*fib_grid.get_coordinates())
 
     # Evaluate Prem
-    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(r)
-    pts = np.array((c, l, r, rho, vpv, vsv, vsh))
+    rho, vpv, vsv, vsh = m1d.prem_eval_point_cloud(grid_data.df['r'])
+    grid_data.set_component('vsv', vsv)
 
     # Evaluate s20rts
     s20mod = s20.S20rts()
-    pts = s20mod.eval_point_cloud(*pts)
+    s20mod.eval_point_cloud_griddata(grid_data)
 
+    # Evaluate Crust
     cst = crust.Crust()
-    pts = cst.eval_point_cloud(*pts.T)
+    pts = cst.eval_point_cloud_grid_data(grid_data)
 
     # Generate mesh for plotting (normalised coordinates)
-    x, y, z = sph2cart(pts[:, 0], pts[:, 1], pts[:, 2]/ r_earth)
+    x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
     elements = triangulate(x, y, z)
     coords = np.array((x, y, z)).T
 
     # Write to vtk
-    write_vtk(os.path.join(VTK_DIR, 'crust_vsv.vtk'), coords, elements, pts[:, 5], 'vsv')
+    write_vtk(os.path.join(VTK_DIR, 'prem_crust_vsv.vtk'), coords, elements, grid_data.get_component('vsv'), 'vsv')
 
 def test_topo():
     """
@@ -319,7 +271,7 @@ def test_topo():
     topo.read()
 
     x, y, z = skl.fibonacci_sphere(10000)
-    _, c, l = cart2sph(x, y, z)
+    c, l, _ = cart2sph(x, y, z)
 
     vals = topo.eval(c, l, param='topo')
     elements = triangulate(x, y, z)

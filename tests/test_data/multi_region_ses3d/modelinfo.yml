@@ -1,0 +1,20 @@
+geometry:
+  rmin: 5771.0
+  rmax: 6371.0
+  cmin: 30.0
+  cmax: 75.0
+  lmin: 115.0
+  lmax: 160.0
+  rotation: False
+  rot_x: 0
+  rot_y: 0
+  rot_z: 0
+  rot_angle: 0
+component_type: perturbation
+components:
+  - rho
+  - vp
+  - vsh
+  - vsv
+model: japan_saule
+reference: put_paper_reference_here

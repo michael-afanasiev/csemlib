@@ -46,12 +46,12 @@ def enclosing_elements(np.ndarray[DTYPE_INT, ndim=1] closest_vertices,
     cdef float ab, bb, cb, db, eb, fb, gb, hb, ib
     cdef float ai, bi, ci, di, ei, fi, gi, hi, ii, det
 
-    cdef np.ndarray[DTYPE_FLOAT, ndim=1] l = np.empty(4, dtype=np.float)
+    cdef np.ndarray[DTYPE_FLOAT, ndim=1] l = np.zeros(4, dtype=np.float)
     cdef np.ndarray[DTYPE_INT, ndim=1] bookkeep = np.zeros(len(x_mesh), dtype=np.int)
     cdef np.ndarray[DTYPE_FLOAT, ndim=2] t = np.ones((vtx_per_elm, vtx_per_elm))
-    cdef np.ndarray[DTYPE_FLOAT, ndim=1] barycentric = np.empty(vtx_per_elm, np.float)
-    cdef np.ndarray[DTYPE_INT, ndim=2] found_elms = np.empty((vtx_per_elm, num_target_points), dtype=np.int)
-    cdef np.ndarray[DTYPE_FLOAT, ndim=2] found_bary = np.empty((vtx_per_elm, num_target_points), dtype=np.float)
+    cdef np.ndarray[DTYPE_FLOAT, ndim=1] barycentric = np.zeros(vtx_per_elm, np.float)
+    cdef np.ndarray[DTYPE_INT, ndim=2] found_elms = np.zeros((vtx_per_elm, num_target_points), dtype=np.int)
+    cdef np.ndarray[DTYPE_FLOAT, ndim=2] found_bary = np.zeros((vtx_per_elm, num_target_points), dtype=np.float)
     cdef np.ndarray[DTYPE_INT, ndim=2] closure = np.full((max_connect, len(x_mesh)), fill_value=-1.0, dtype=np.int)
     ##### END VARIABLES DECLARATIONS #####
 
