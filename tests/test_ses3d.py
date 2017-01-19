@@ -48,6 +48,8 @@ def test_ses3d_griddata():
     mod = Ses3d_rbf('japan', os.path.join(TEST_DATA_DIR, 'japan'),
                     components=grid_data.components, interp_method='nearest_neighbour')
     mod.eval_point_cloud_griddata(grid_data)
+    mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
+    mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
 
     # Write vtk
     x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
@@ -155,4 +157,37 @@ def test_ses3d():
 
     np.testing.assert_almost_equal(true, interp, decimal=DECIMAL_CLOSE)
 
+def test_ses3d_griddata_return_itself():
+    """
+    Test to ensure that a ses3d model returns itself.
+    """
+
+    mod = s3d.Ses3d('japan', os.path.join(TEST_DATA_DIR, 'japan'),
+                    components=['rho', 'vsv', 'vsh', 'vp'])
+    mod.read()
+
+    all_cols, all_lons, all_rads = np.meshgrid(
+        mod.data().coords['col'].values,
+        mod.data().coords['lon'].values,
+        mod.data().coords['rad'].values)
+
+    grid_data = GridData(mod.data()['x'].values.ravel(), mod.data()['y'].values.ravel(), mod.data()['z'].values.ravel(), coord_system='cartesian')
+    grid_data.add_components(['vsv', 'rho', 'vsh', 'vp'])
+
+    mod.eval_point_cloud_griddata(grid_data)
+
+    # Setup true data.
+    true = np.empty((len(all_cols.ravel()), 4))
+    true[:, 0] = mod.data()['vsv'].values.ravel()
+    true[:, 1] = mod.data()['rho'].values.ravel()
+    true[:, 2] = mod.data()['vsh'].values.ravel()
+    true[:, 3] = mod.data()['vp'].values.ravel()
+
+    interp = np.empty((len(all_cols.ravel()), 4))
+    interp[:, 0] = grid_data.get_component('vsv')
+    interp[:, 1] = grid_data.get_component('rho')
+    interp[:, 2] = grid_data.get_component('vsh')
+    interp[:, 3] = grid_data.get_component('vp')
+
+    np.testing.assert_almost_equal(true, grid_data.get_data(), decimal=DECIMAL_CLOSE)
 

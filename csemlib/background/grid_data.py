@@ -43,11 +43,6 @@ class GridData:
     def append(self, griddata):
         self.df = self.df.append(griddata.df)
 
-    def set_coordinates(self, x, y, z):
-        self.df['x'] = x
-        self.df['y'] = y
-        self.df['z'] = z
-
     def add_components(self, components):
         self.components.extend(components)
         for component in components:
@@ -56,6 +51,7 @@ class GridData:
     def del_components(self, components):
         for component in components:
             del self.df[component]
+            self.components.remove(component)
 
     def set_component(self, component, values):
         if component not in self.df.columns:
@@ -69,12 +65,12 @@ class GridData:
         return self.df[self.components].values
 
     def get_coordinates(self, coordinate_type=None):
-        if coordinate_type == 'spherical' and self.coordinate_system == 'cartesian':
-            return cart2sph(*self.df[self.coordinates].values.T)
-        elif coordinate_type == 'cartesian' and self.coordinate_system == 'spherical':
-            return sph2cart(*self.df[self.coordinates].values.T)
-        else:
-            return self.df[self.coordinates].values
+        coordinate_type = coordinate_type or self.coordinate_system
+
+        if coordinate_type == 'spherical':
+            return self.df[['c', 'l', 'r']].values
+        elif coordinate_type == 'cartesian':
+            return self.df[['x', 'y', 'z']].values
 
     def add_col_lon_rad(self):
         self.df['c'], self.df['l'], self.df['r'] = cart2sph(self.df['x'], self.df['y'], self.df['z'])

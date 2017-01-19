@@ -60,7 +60,9 @@ class Ses3d_rbf(Ses3d):
             self.grid_data_ses3d.set_component(component, self.data()[component].values.ravel())
 
 
-    def eval_point_cloud_griddata(self, GridData):
+    def eval_point_cloud_griddata(self, GridData, interp_method=None):
+        interp_method = interp_method or self.interp_method
+
         print('Evaluating SES3D model:', self.model_info['model'])
 
         grid_coords = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
@@ -71,7 +73,7 @@ class Ses3d_rbf(Ses3d):
         pnt_tree_orig = spatial.cKDTree(grid_coords)
 
         # do nearest neighbour
-        if self.interp_method == 'nearest_neighbour':
+        if interp_method == 'nearest_neighbour':
             _, indices = pnt_tree_orig.query(ses3d_dmn.get_coordinates(coordinate_type='cartesian'), k=1)
             for component in self.components:
                 if self.model_info['component_type'] == 'perturbation':
@@ -94,11 +96,11 @@ class Ses3d_rbf(Ses3d):
                 coords_new = ses3d_dmn.get_coordinates(coordinate_type='cartesian').T
                 x_c_new, y_c_new, z_c_new = coords_new.T[i]
 
-                if self.interp_method == 'griddata_linear':
+                if interp_method == 'griddata_linear':
                     pts_local = np.array((x_c_orig, y_c_orig, z_c_orig)).T
                     xi = np.array((x_c_new, y_c_new, z_c_new))
                     val = griddata(pts_local, dat_orig, xi, method='linear', fill_value=0.0)
-                elif self.interp_method == 'radial_basis_func':
+                elif interp_method == 'radial_basis_func':
                     rbfi = Rbf(x_c_orig, y_c_orig, z_c_orig, dat_orig, function='linear')
                     val = rbfi(x_c_new, y_c_new, z_c_new)
 

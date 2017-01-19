@@ -45,7 +45,7 @@ def cart2sph(x, y, z):
 
 def get_rot_matrix(angle, x, y, z):
     """
-    :param angle: Rotation angle in radians (Right-Hand rule, counterclockwise positive)
+    :param angle: Rotation angle in radians (Right-Hand rule)
     :param x: x-component of rotational vector
     :param y: y-component of rotational vector
     :param z: z-component of rotational vector

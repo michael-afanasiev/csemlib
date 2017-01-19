@@ -245,7 +245,7 @@ class Ses3d(Model):
 
         for i, p in enumerate(self.components):
             if self.model_info['component_type'] == 'perturbation':
-                ses3d_dmn.df[p] = ses3d_dmn.df[p] * interp[:, i]
+                ses3d_dmn.df[p] += interp[:, i]
             elif self.model_info['component_type'] == 'absolute':
                 ses3d_dmn.df[p] = interp[:, i]
 
