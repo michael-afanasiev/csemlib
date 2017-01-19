@@ -26,29 +26,6 @@ class Ses3d_rbf(Ses3d):
         self.init_grid_data()
         self.interp_method = interp_method
 
-    def split_domain(self, GridData):
-        ses3d_pts = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
-
-        # Collect all the points that form the convex hull
-        hull = ConvexHull(ses3d_pts)
-        pts_hull = []
-        for point in np.unique(hull.simplices.flatten()):
-            pts_hull.append(ses3d_pts[point])
-        pts_hull = np.array(pts_hull)
-
-        # Perform Delauney triangulation from hull points
-        hull = spatial.Delaunay(pts_hull)
-
-        # Split points into points that fall inside and outside of convex hull
-        in_or_out = hull.find_simplex(GridData.get_coordinates(coordinate_type='cartesian'))>=0
-        indices_in = np.where(in_or_out == True)
-        indices_out = np.where(in_or_out == False)
-
-        pts_other = GridData[indices_out]
-        pts_new = GridData[indices_in]
-
-        return pts_new, pts_other
-
 
     def init_grid_data(self):
         x = self.data()['x'].values.ravel()
