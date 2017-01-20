@@ -57,6 +57,14 @@ def test_ses3d_griddata():
     pts = np.array((x, y, z)).T
     write_vtk("ses3d_nearest_neighbour.vtk", pts, elements, grid_data.get_component('vsv'), 'ses3dvsv')
 
+def test_quick():
+
+    mod = s3d.Ses3d('europe_1s', os.path.join(TEST_DATA_DIR, 'europe_1s'),
+            components=['vsv'])
+    mod.read()
+    print(mod.data(0))
+    exit(0)
+
 
 def test_ses3d_multi_region_read():
     """
