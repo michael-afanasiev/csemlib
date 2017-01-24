@@ -127,9 +127,9 @@ class Ses3d(Model):
             self._data[i].coords['lon'] = np.radians(lon_regions[i])
             self._data[i].coords['rad'] = rad_regions[i]
 
-            lons, cols, rads = np.meshgrid(self._data[i].coords['lon'].values,
-                                           self._data[i].coords['col'].values,
-                                           self._data[i].coords['rad'].values)
+            cols, lons, rads = np.meshgrid(self._data[i].coords['col'].values,
+                                           self._data[i].coords['lon'].values,
+                                           self._data[i].coords['rad'].values, indexing='ij')
 
             # Cartesian coordinates and rotation.
             x, y, z = sph2cart(cols.ravel(), lons.ravel(), rads.ravel())
