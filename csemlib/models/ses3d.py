@@ -18,7 +18,6 @@ def _read_multi_region_file(data):
         region_start = int(region_start + num_region + 1) if region_start else int(2)
         num_region = int(data[region_start - 1]) if num_region else int(data[1])
         regions.append(data[region_start:region_start + num_region])
-
     return regions
 
 
@@ -112,10 +111,9 @@ class Ses3d(Model):
 
             for i, _ in enumerate(val_regions):
                 val_regions[i] = val_regions[i].reshape((len(col_regions[i]), len(lon_regions[i]),
-                                                         len(rad_regions[i])))
+                                                         len(rad_regions[i])), order='C')
                 if not self._data:
                     self._data = [xarray.Dataset() for j in range(len(val_regions))]
-
                 self._data[i][p] = (('col', 'lon', 'rad'), val_regions[i])
                 if 'rho' in p:
                     self._data[i][p].attrs['units'] = 'g/cm3'
@@ -131,7 +129,7 @@ class Ses3d(Model):
 
             cols, lons, rads = np.meshgrid(self._data[i].coords['col'].values,
                                            self._data[i].coords['lon'].values,
-                                           self._data[i].coords['rad'].values)
+                                           self._data[i].coords['rad'].values, indexing='ij')
 
             # Cartesian coordinates and rotation.
             x, y, z = sph2cart(cols.ravel(), lons.ravel(), rads.ravel())
@@ -141,9 +139,9 @@ class Ses3d(Model):
                 self.rot_mat = _setup_rot_matrix(np.radians(self.geometry['rot_angle']), *self.rot_vec)
                 x, y, z = rotate(x, y, z, self.rot_mat)
 
-            self._data[i]['x'] = (('col', 'lon', 'rad'), x.reshape((s_col, s_lon, s_rad)))
-            self._data[i]['y'] = (('col', 'lon', 'rad'), y.reshape((s_col, s_lon, s_rad)))
-            self._data[i]['z'] = (('col', 'lon', 'rad'), z.reshape((s_col, s_lon, s_rad)))
+            self._data[i]['x'] = (('col', 'lon', 'rad'), x.reshape((s_col, s_lon, s_rad), order='C'))
+            self._data[i]['y'] = (('col', 'lon', 'rad'), y.reshape((s_col, s_lon, s_rad), order='C'))
+            self._data[i]['z'] = (('col', 'lon', 'rad'), z.reshape((s_col, s_lon, s_rad), order='C'))
 
             # Add units.
             self._data[i].coords['col'].attrs['units'] = 'radians'

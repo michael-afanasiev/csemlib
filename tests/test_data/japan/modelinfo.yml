@@ -11,10 +11,12 @@ geometry:
   rot_z: 0
   rot_angle: 0
 component_type: perturbation
+num_regions: 1
 components:
   - rho
   - vp
   - vsh
   - vsv
 model: japan_saule
-reference: put_paper_reference_here
+taper: False
+reference: put_paper_rqeference_here

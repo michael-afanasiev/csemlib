@@ -28,35 +28,40 @@ class Ses3d_rbf(Ses3d):
 
 
     def init_grid_data(self):
-        x = self.data()['x'].values.ravel()
-        y = self.data()['y'].values.ravel()
-        z = self.data()['z'].values.ravel()
+        x, y, z = np.array([]), np.array([]), np.array([])
+
+        for i in range(self.model_info['num_regions']):
+            x = np.append(x, self.data(i)['x'].values.ravel())
+            y = np.append(y, self.data(i)['y'].values.ravel())
+            z = np.append(z, self.data(i)['z'].values.ravel())
         self.grid_data_ses3d = GridData(x, y, z, components=self.components)
 
         for component in self.components:
-            self.grid_data_ses3d.set_component(component, self.data()[component].values.ravel())
+            dat = np.array([])
+            for i in range(self.model_info['num_regions']):
+                dat = np.append(dat, self.data(i)[component].values.ravel())
+            self.grid_data_ses3d.set_component(component, dat)
 
 
     def eval_point_cloud_griddata(self, GridData, interp_method=None):
-        interp_method = interp_method or self.interp_method
-
         print('Evaluating SES3D model:', self.model_info['model'])
 
+        interp_method = interp_method or self.interp_method
         grid_coords = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
         # Split domain in points that lie within convex hull and fall outside
         ses3d_dmn = self.extract_ses3d_dmn(GridData)
 
         # Generate KDTrees
-        pnt_tree_orig = spatial.cKDTree(grid_coords)
+        pnt_tree_orig = spatial.cKDTree(grid_coords, balanced_tree=False)
 
-        # do nearest neighbour
+        # Do nearest neighbour
         if interp_method == 'nearest_neighbour':
             _, indices = pnt_tree_orig.query(ses3d_dmn.get_coordinates(coordinate_type='cartesian'), k=1)
             for component in self.components:
                 if self.model_info['component_type'] == 'perturbation':
                     ses3d_dmn.df[:][component] += self.grid_data_ses3d.df[component][indices].values
                 if self.model_info['component_type'] == 'absolute':
-                    ses3d_dmn.df[:][component] += self.grid_data_ses3d.df[component][indices].values
+                    ses3d_dmn.df[:][component] = self.grid_data_ses3d.df[component][indices].values
 
             GridData.df.update(ses3d_dmn.df)
             return

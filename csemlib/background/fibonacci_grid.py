@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from csemlib.utils import cart2sph, sph2cart
+from csemlib.utils import cart2sph, sph2cart, get_rot_matrix, rotate
 
 
 class FibonacciGrid:
@@ -46,7 +46,8 @@ class FibonacciGrid:
             self._z = np.append(self._z, z * radii[i])
 
 
-    def add_refinement_region(self, c_min, c_max, l_min, l_max, radii, resolution):
+    def add_refinement_region(self, c_min, c_max, l_min, l_max, radii, resolution,
+                              angle=None, rot_x=0, rot_y=0, rot_z=0):
         """
         This function returns a refinement region
         :param c_min: minimum colatitude in radians
@@ -55,9 +56,14 @@ class FibonacciGrid:
         :param l_max: maximum longitude in radians
         :param radii: array specifiying all the radius where a layer should be added
         :param resolution: array specifying the resolution of these layers in km
+        :param angle: rotation angle in radians
+        :param rot_x: rotation vector x
+        :param rot_y: rotation vector y
+        :param rot_z: rotation vector z
         :return:
         """
-
+        if angle:
+            self.rotate(-angle, rot_x, rot_y, rot_z)
         self.discard_region(c_min, c_max, l_min, l_max, np.min(radii), np.max(radii))
 
         for i in range(len(radii)):
@@ -78,6 +84,9 @@ class FibonacciGrid:
             self._x = np.append(self._x, x * radii[i])
             self._y = np.append(self._y, y * radii[i])
             self._z = np.append(self._z, z * radii[i])
+
+        if angle:
+            self.rotate(angle, rot_x, rot_y, rot_z)
 
     def discard_region(self, c_min, c_max, l_min, l_max, r_min, r_max):
         """
@@ -168,4 +177,7 @@ class FibonacciGrid:
         else:
             raise ValueError('Incorrect type specified in FibonacciGrid.get_coordinates')
 
+    def rotate(self, angle, x, y, z):
+        rot_mat = get_rot_matrix(angle, x, y, z)
+        self._x, self._y, self._z = rotate(self._x, self._y, self._z, rot_mat)
 
