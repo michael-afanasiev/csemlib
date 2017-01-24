@@ -23,20 +23,21 @@ def test_fibonacci_grid():
     radii = np.linspace(6371.0, 0.0, 5)
     resolution = np.ones_like(radii) * (6371.0 / 5)
     fib_grid.set_global_sphere(radii, resolution)
-    # refinement region coarse
-    c_min = np.radians(30)
-    c_max = np.radians(70)
-    l_min = np.radians(105)
-    l_max = np.radians(155)
-    radii_regional = np.linspace(6371.0, 0.0, 20)
+    # refinement region coarse europe
+    c_min = np.radians(50)
+    c_max = np.radians(120)
+    l_min = np.radians(-30)
+    l_max = np.radians(60)
+    radii_regional = np.linspace(6371.0, 5571.0, 10)
     resolution_regional = np.ones_like(radii_regional) * (6371.0 / 20)
-    fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
+    fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional,
+                                   angle=np.radians(-57.5), rot_y=1)
 
-    # refinement region fine
-    c_min = np.radians(40)
-    c_max = np.radians(60)
+    # refinement region fine Japan
+    c_min = np.radians(30)
+    c_max = np.radians(75)
     l_min = np.radians(115)
-    l_max = np.radians(145)
+    l_max = np.radians(160)
     radii_regional = np.linspace(6371.0, 5571.0, 4)
     resolution_regional = np.ones_like(radii_regional) * 200
     fib_grid.add_refinement_region(c_min, c_max, l_min, l_max, radii_regional, resolution_regional)
@@ -51,7 +52,7 @@ def test_fibonacci_grid():
     elements = triangulate(x, y, z)
 
     pts = np.array((x, y, z)).T
-    np.testing.assert_allclose(np.sum(x ** 2 + y ** 2 + z ** 2), 1354.02618667, rtol=.02, atol=0)
+    np.testing.assert_allclose(np.sum(x ** 2 + y ** 2 + z ** 2), 5469.0929941834, rtol=.02, atol=0)
     write_vtk(os.path.join(VTK_DIR, 'test_fib_grid.vtk'), pts, elements, vals, 'ones')
 
 
