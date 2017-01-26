@@ -104,8 +104,8 @@ class FibonacciGrid:
         pts = np.array((r, c, l)).T
 
         # Extract r_domain
-        below_domain = pts[pts[:, 0] < r_min]
-        above_domain = pts[pts[:, 0] > r_max]
+        below_domain = pts[pts[:, 0] < r_min - np.finfo(float).eps]
+        above_domain = pts[pts[:, 0] > r_max + np.finfo(float).eps]
         r_domain = pts[pts[:, 0] <= r_max]
         r_domain = r_domain[r_domain[:, 0] >= r_min]
         # Append points that fall outside of domain
