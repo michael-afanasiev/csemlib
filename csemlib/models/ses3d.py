@@ -104,7 +104,11 @@ class Ses3d(Model):
             rad_regions[i] = 0.5 * (rad_regions[i][1:] + rad_regions[i][:-1])
 
         # Read in parameters.
-        for p in self.components:
+        if self.model_info['taper']:
+            components = self.components + ['taper']
+        else:
+            components = self.components
+        for p in components:
             with io.open(os.path.join(self.directory, p), 'rt') as fh:
                 data = np.asarray(fh.readlines(), dtype=float)
                 val_regions = _read_multi_region_file(data)
@@ -228,30 +232,46 @@ class Ses3d(Model):
 
         return np.array(interp_param).T
 
-
     def eval_point_cloud_griddata(self, GridData):
         # Read model
-        self.components = GridData.components
+        if self.model_info['taper']:
+            self.components = ['taper'] + GridData.components
+        else:
+            self.components = GridData.components
         self.read()
-
         # Get dmn
-        # Turn off for europe to test
-        ses3d_dmn = self.extract_ses3d_dmn(GridData)
+        for region in range(self.model_info['region_info']['num_regions']):
+            ses3d_dmn = self.extract_ses3d_dmn(GridData, region)
 
-        # Interpolate
-        interp = self.eval(ses3d_dmn.df['x'], ses3d_dmn.df['y'], ses3d_dmn.df['z'], self.components)
+            if len(ses3d_dmn) < 1:
+                continue
 
-        for i, p in enumerate(self.components):
-            if self.model_info['component_type'] == 'perturbation':
-                ses3d_dmn.df[p] += interp[:, i]
-            elif self.model_info['component_type'] == 'absolute':
-                ses3d_dmn.df[p] = interp[:, i]
+            interp = self.eval(ses3d_dmn.df['x'], ses3d_dmn.df['y'], ses3d_dmn.df['z'], self.components, region)
 
-        GridData.df.update(ses3d_dmn.df)
+            for i, p in enumerate(self.components):
+                if self.model_info['component_type'] == 'perturbation':
+                    if p == 'taper':
+                        ses3d_dmn.df[p] = interp[:, i]
+                        continue
+                    if self.model_info['taper']:
+                        taper = ses3d_dmn.df['taper']
+                        ses3d_dmn.df[p] += (interp[:, i] * taper)
+                    else:
+                        ses3d_dmn.df[p] += interp[:, i]
+                elif self.model_info['component_type'] == 'absolute':
+                    if p == 'taper':
+                        ses3d_dmn.df[p] = interp[:, i]
+                        continue
+                    if self.model_info['taper']:
+                        taper = ses3d_dmn.df['taper']
+                        ses3d_dmn.df[p] = taper * interp[:, i] + (1 - taper) * ses3d_dmn.df[p]
+                    else:
+                        ses3d_dmn.df[p] = interp[:, i]
 
+            GridData.df.update(ses3d_dmn.df)
         return GridData
 
-    def extract_ses3d_dmn(self, GridData):
+    def extract_ses3d_dmn(self, GridData, region=0):
         geometry = self.model_info['geometry']
         ses3d_dmn = GridData.copy()
 
@@ -259,13 +279,43 @@ class Ses3d(Model):
         if geometry['rotation'] is True:
             ses3d_dmn.rotate(-np.radians(geometry['rot_angle']), geometry['rot_x'],
                              geometry['rot_y'], geometry['rot_z'])
-        # Extract
+
+        # Extract region
         ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['c'] >= np.deg2rad(geometry['cmin'])]
         ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['c'] <= np.deg2rad(geometry['cmax'])]
-        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['l'] >= np.deg2rad(geometry['lmin'])]
-        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['l'] <= np.deg2rad(geometry['lmax'])]
-        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= geometry['rmin']]
-        ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= geometry['rmax']]
+
+        l_min = geometry['lmin']
+        l_max = geometry['lmax']
+
+        if l_min > 180.0:
+            l_min -= 360.0
+
+        if l_max > 180.0:
+            l_max -= 360.0
+
+        if l_max >= l_min:
+            ses3d_dmn.df = ses3d_dmn.df[(ses3d_dmn.df["l"] >=
+                                        np.deg2rad(l_min)) & (ses3d_dmn.df["l"] <= np.deg2rad(l_max))]
+        elif l_max < l_min:
+            ses3d_dmn.df = ses3d_dmn.df[(ses3d_dmn.df["l"] <=
+                                        np.deg2rad(l_max)) | (ses3d_dmn.df["l"] >= np.deg2rad(l_min))]
+
+        if self.model_info['region_info']['num_regions'] > 1:
+            region_info = self.model_info['region_info']
+            bottom = 'region_{}_bottom'.format(region)
+            top = 'region_{}_top'.format(region)
+
+            if region == 0:
+                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= region_info[bottom]]
+                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= region_info[top]]
+
+            else:
+                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= region_info[bottom]]
+                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] < region_info[top]]
+
+        else:
+            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= geometry['rmin']]
+            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= geometry['rmax']]
 
         # Rotate Back
         if geometry['rotation'] is True:
