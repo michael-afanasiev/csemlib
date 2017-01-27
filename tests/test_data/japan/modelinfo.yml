@@ -11,7 +11,10 @@ geometry:
   rot_z: 0
   rot_angle: 0
 component_type: perturbation
-num_regions: 1
+region_info:
+  num_regions: 1
+  region_0_top: 6371.0
+  region_0_bottom: 5771.0
 components:
   - rho
   - vp
