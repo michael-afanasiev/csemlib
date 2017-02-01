@@ -4,6 +4,7 @@ import os
 import sys
 
 from csemlib.background.grid_data import GridData
+from csemlib.models.one_dimensional import prem_eval_point_cloud
 from csemlib.models.ses3d import Ses3d
 
 import numpy as np
@@ -29,6 +30,8 @@ class Ses3d_rbf(Ses3d):
         z = self.data(region)['z'].values.ravel()
         self.grid_data_ses3d = GridData(x, y, z, components=self.components)
 
+        if self.model_info['component_type'] == 'perturbation':
+            self.grid_data_ses3d.add_one_d()
         if self.model_info['taper']:
             components = self.components + ['taper']
         else:
@@ -68,7 +71,9 @@ class Ses3d_rbf(Ses3d):
             if self.model_info['component_type'] == 'perturbation':
                 if self.model_info['taper']:
                     taper = self.grid_data_ses3d.df['taper'][indices].values
-                    ses3d_dmn.df[:][component] += self.grid_data_ses3d.df[component][indices].values * taper
+                    one_d = self.grid_data_ses3d.df['one_d_{}'.format(component)][indices].values
+                    ses3d_dmn.df[:][component] = ((one_d + self.grid_data_ses3d.df[component][indices].values) * taper) + \
+                                                 (1 - taper) * ses3d_dmn.df[:][component]
                 else:
                     ses3d_dmn.df[:][component] += self.grid_data_ses3d.df[component][indices].values
             if self.model_info['component_type'] == 'absolute':

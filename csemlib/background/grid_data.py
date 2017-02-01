@@ -3,6 +3,7 @@ import numpy as np
 import copy
 
 from csemlib.background.fibonacci_grid import FibonacciGrid
+from csemlib.models.one_dimensional import prem_eval_point_cloud
 from csemlib.utils import cart2sph, sph2cart, get_rot_matrix, rotate
 
 
@@ -84,3 +85,13 @@ class GridData:
 
         # Also update c,l,r coordinates
         self.add_col_lon_rad()
+
+    def add_one_d(self):
+        one_d_rho, one_d_vpv, one_d_vsv, one_d_vsh = prem_eval_point_cloud(self.df['r'])
+        self.set_component('one_d_rho', one_d_rho)
+        self.set_component('one_d_vp', one_d_vpv)
+        self.set_component('one_d_vsv', one_d_vsv)
+        self.set_component('one_d_vsh', one_d_vsh)
+
+    def del_one_d(self):
+        self.del_components(['one_d_rho', 'one_d_vpv', 'one_d_vsv', 'one_d_vsh'])

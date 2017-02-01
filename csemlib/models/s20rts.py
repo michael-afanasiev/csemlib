@@ -127,7 +127,7 @@ class S20rts(Model):
         :param vsh: param to be returned - currently not used
         :return c, l, r, rho, vpv, vsv, vsh
         """
-        print('Evaluating S20rts')
+        print('Evaluating S20RTS')
         self.read()
         s20rts_dmn = self.split_domains_griddata(GridData)
 
