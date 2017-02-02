@@ -226,3 +226,6 @@ def test_rotation():
         'test_region')), components=['vsv'])
     mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
     mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
+    mod.eval_point_cloud_griddata(grid_data)
+    grid_data.del_one_d()
+    
