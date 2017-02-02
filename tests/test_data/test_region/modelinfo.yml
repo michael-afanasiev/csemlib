@@ -1,0 +1,25 @@
+geometry:
+  rmin: 6100.0
+  rmax: 6300.0
+  cmin: 80.0
+  cmax: 90.0
+  lmin: 80.0
+  lmax: 90.0
+  rotation: True
+  rot_x: 0
+  rot_y: 1
+  rot_z: 0
+  rot_angle: -57.0
+
+# component_type can be set to absolute or perturbation, should be perturbation for japan
+component_type: perturbation
+region_info:
+  num_regions: 1
+  region_0_top: 6300.0
+  region_0_bottom: 6100.0
+components:
+  - vsv
+model: test_region
+# Taper should in fact be set to True for Japan, but for testing purposes t is set to False
+taper: True
+reference: put_paper_reference_here

@@ -53,7 +53,7 @@ def test_ses3d_griddata():
     mod.model_info['component_type'] = 'perturbation'
     mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
     mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
-    
+
     # Write vtk
     x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
     elements = triangulate(x, y, z)
@@ -136,7 +136,7 @@ def test_ses3d_multi_region_write():
     shutil.rmtree(new_write_dir)
 
 
-def test_ses3d():
+def test_ses3d_enclosing_element_interpolation():
     """
     Test to ensure that a ses3d model returns itself.
     """
@@ -204,3 +204,25 @@ def test_hdf5_writer():
     mod.read()
 
     mod.write_to_hdf5()
+
+def test_rotation():
+
+    #  Generate visualisation grid
+    fib_grid = FibonacciGrid()
+    # Set global background grid
+    radii = np.linspace(6271.0, 6271.0, 1)
+    resolution = np.ones_like(radii) * 300
+    fib_grid.set_global_sphere(radii, resolution)
+
+    grid_data = GridData(*fib_grid.get_coordinates())
+    grid_data.add_one_d()
+    grid_data.set_component('vsv', np.zeros(len(grid_data)))
+
+    mod = s3d.Ses3d('test_region', os.path.join(os.path.join(TEST_DATA_DIR,
+        'test_region')), components=['vsv'])
+    mod.eval_point_cloud_griddata(grid_data)
+
+    mod = Ses3d_rbf('test_region', os.path.join(os.path.join(TEST_DATA_DIR,
+        'test_region')), components=['vsv'])
+    mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
+    mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
