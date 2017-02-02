@@ -11,8 +11,8 @@ geometry:
   rot_z: 0
   rot_angle: 0
 
-# component_type can be set to absolute or perturbation
-component_type: perturbation
+# component_type can be set to absolute or perturbation, should be perturbation for japan
+component_type: absolute
 region_info:
   num_regions: 1
   region_0_top: 6371.0
@@ -24,5 +24,5 @@ components:
   - vsv
 model: japan_saule
 # Taper should in fact be set to True for Japan, but for testing purposes t is set to False
-taper: False
+taper: True
 reference: put_paper_reference_here

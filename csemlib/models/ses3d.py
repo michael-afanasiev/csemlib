@@ -233,8 +233,6 @@ class Ses3d(Model):
                         continue
                     if self.model_info['taper']:
                         taper = ses3d_dmn.df['taper']
-                        #ses3d_dmn.df[p] += (interp[:, i] * taper)
-
                         ses3d_dmn.df[p] = (ses3d_dmn.df['one_d_{}'.format(p)] + interp[:, i]) * taper +\
                                           (1 - taper) * ses3d_dmn.df[p]
                     else:
@@ -281,22 +279,17 @@ class Ses3d(Model):
             ses3d_dmn.df = ses3d_dmn.df[(ses3d_dmn.df["l"] <=
                                         np.deg2rad(l_max)) | (ses3d_dmn.df["l"] >= np.deg2rad(l_min))]
 
-        if self.model_info['region_info']['num_regions'] > 1:
-            region_info = self.model_info['region_info']
-            bottom = 'region_{}_bottom'.format(region)
-            top = 'region_{}_top'.format(region)
+        region_info = self.model_info['region_info']
+        bottom = 'region_{}_bottom'.format(region)
+        top = 'region_{}_top'.format(region)
 
-            if region == 0:
-                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= region_info[bottom]]
-                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= region_info[top]]
-
-            else:
-                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= region_info[bottom]]
-                ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] < region_info[top]]
+        if region == 0:
+            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= region_info[bottom]]
+            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= region_info[top]]
 
         else:
-            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= geometry['rmin']]
-            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] <= geometry['rmax']]
+            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] >= region_info[bottom]]
+            ses3d_dmn.df = ses3d_dmn.df[ses3d_dmn.df['r'] < region_info[top]]
 
         # Rotate Back
         if geometry['rotation'] is True:

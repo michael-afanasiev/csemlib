@@ -136,12 +136,12 @@ class Ses3d_rbf(Ses3d):
                         ses3d_dmn.df[component].values[i] = val
             i += 1
 
-            if i % 200 == 0:
+            if i % 100 == 0:
                 ind = float(i)
                 percent = ind / len(all_neighbours) * 100.0
-                sys.stdout.write("\rProgress: %.1f%%" % percent)
+                sys.stdout.write("\rProgress: %.1f%% " % percent)
                 sys.stdout.flush()
-
+        sys.stdout.write("\r")
         if self.model_info['taper']:
             del ses3d_dmn.df['taper']
 
