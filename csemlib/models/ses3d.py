@@ -2,12 +2,12 @@ import datetime
 import io
 import os
 import yaml
-
+import h5py
 import numpy as np
 import xarray
 
 from .model import Model, shade, triangulate, interpolate
-from ..utils import sph2cart, rotate
+from ..utils import sph2cart, rotate, get_rot_matrix
 
 
 def _read_multi_region_file(data):
@@ -19,28 +19,6 @@ def _read_multi_region_file(data):
         num_region = int(data[region_start - 1]) if num_region else int(data[1])
         regions.append(data[region_start:region_start + num_region])
     return regions
-
-
-def _setup_rot_matrix(angle, x, y, z):
-    # Normalize vector.
-    norm = np.sqrt(x ** 2 + y ** 2 + z ** 2)
-    x /= norm
-    y /= norm
-    z /= norm
-
-    # Setup matrix components.
-    matrix = np.empty((3, 3))
-    matrix[0, 0] = np.cos(angle) + (x ** 2) * (1 - np.cos(angle))
-    matrix[1, 0] = z * np.sin(angle) + x * y * (1 - np.cos(angle))
-    matrix[2, 0] = (-1) * y * np.sin(angle) + x * z * (1 - np.cos(angle))
-    matrix[0, 1] = x * y * (1 - np.cos(angle)) - z * np.sin(angle)
-    matrix[1, 1] = np.cos(angle) + (y ** 2) * (1 - np.cos(angle))
-    matrix[2, 1] = x * np.sin(angle) + y * z * (1 - np.cos(angle))
-    matrix[0, 2] = y * np.sin(angle) + x * z * (1 - np.cos(angle))
-    matrix[1, 2] = (-1) * x * np.sin(angle) + y * z * (1 - np.cos(angle))
-    matrix[2, 2] = np.cos(angle) + (z * z) * (1 - np.cos(angle))
-
-    return matrix
 
 
 class Ses3d(Model):
@@ -140,7 +118,7 @@ class Ses3d(Model):
             if self.model_info['geometry']['rotation']:
                 if len(self.rot_vec) is not 3:
                     raise ValueError("Rotation matrix must be a 3-vector.")
-                self.rot_mat = _setup_rot_matrix(np.radians(self.geometry['rot_angle']), *self.rot_vec)
+                self.rot_mat = get_rot_matrix(np.radians(self.geometry['rot_angle']), *self.rot_vec)
                 x, y, z = rotate(x, y, z, self.rot_mat)
 
             self._data[i]['x'] = (('col', 'lon', 'rad'), x.reshape((s_col, s_lon, s_rad), order='C'))
@@ -255,7 +233,10 @@ class Ses3d(Model):
                         continue
                     if self.model_info['taper']:
                         taper = ses3d_dmn.df['taper']
-                        ses3d_dmn.df[p] += (interp[:, i] * taper)
+                        #ses3d_dmn.df[p] += (interp[:, i] * taper)
+
+                        ses3d_dmn.df[p] = (ses3d_dmn.df['one_d_{}'.format(p)] + interp[:, i]) * taper +\
+                                          (1 - taper) * ses3d_dmn.df[p]
                     else:
                         ses3d_dmn.df[p] += interp[:, i]
                 elif self.model_info['component_type'] == 'absolute':
@@ -323,3 +304,18 @@ class Ses3d(Model):
                              geometry['rot_y'], geometry['rot_z'])
 
         return ses3d_dmn
+
+    def write_to_hdf5(self):
+
+        filename = os.path.join(self.directory, "{}.hdf5".format(self.model_info['model']))
+        f = h5py.File(filename, "w")
+
+        parameters = ['x', 'y', 'z'] + self.model_info['components']
+        if self.model_info['taper']:
+            parameters += ['taper']
+
+        for region in range(self.model_info['region_info']['num_regions']):
+            region_grp = f.create_group('region_{}'.format(region))
+            for param in parameters:
+                region_grp.create_dataset(param, data=self.data(region)[param].values.ravel(), dtype='f')
+        f.close()

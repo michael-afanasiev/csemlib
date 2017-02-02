@@ -1,10 +1,9 @@
-import io
 import os
 
 import sys
 
+import h5py
 from csemlib.background.grid_data import GridData
-from csemlib.models.one_dimensional import prem_eval_point_cloud
 from csemlib.models.ses3d import Ses3d
 
 import numpy as np
@@ -20,25 +19,26 @@ class Ses3d_rbf(Ses3d):
 
     def __init__(self, name, directory, components=[], doi=None, interp_method='nearest_neighbour'):
         super(Ses3d_rbf, self).__init__(name, directory, components, doi)
-        self.read()
         self.grid_data_ses3d = None
         self.interp_method = interp_method
 
-    def init_grid_data(self, region=0):
-        x = self.data(region)['x'].values.ravel()
-        y = self.data(region)['y'].values.ravel()
-        z = self.data(region)['z'].values.ravel()
+    def init_grid_data_hdf5(self, region=0):
+        filename = os.path.join(self.directory, "{}.hdf5".format(self.model_info['model']))
+        f = h5py.File(filename, "r")
+
+        x = f['region_{}'.format(region)]['x'][:]
+        y = f['region_{}'.format(region)]['y'][:]
+        z = f['region_{}'.format(region)]['z'][:]
+
         self.grid_data_ses3d = GridData(x, y, z, components=self.components)
 
-        if self.model_info['component_type'] == 'perturbation':
-            self.grid_data_ses3d.add_one_d()
         if self.model_info['taper']:
             components = self.components + ['taper']
         else:
             components = self.components
         for component in components:
-            dat = self.data(region)[component].values.ravel()
-            self.grid_data_ses3d.set_component(component, dat)
+            self.grid_data_ses3d.set_component(component, f['region_{}'.format(region)][component][:])
+        f.close()
 
     def eval_point_cloud_griddata(self, GridData, interp_method=None):
         print('Evaluating SES3D model:', self.model_info['model'])
@@ -52,7 +52,7 @@ class Ses3d_rbf(Ses3d):
             if len(ses3d_dmn) == 0:
                 continue
 
-            self.init_grid_data(region)
+            self.init_grid_data_hdf5(region)
             grid_coords = self.grid_data_ses3d.get_coordinates(coordinate_type='cartesian')
 
             # Generate KDTrees
@@ -71,7 +71,7 @@ class Ses3d_rbf(Ses3d):
             if self.model_info['component_type'] == 'perturbation':
                 if self.model_info['taper']:
                     taper = self.grid_data_ses3d.df['taper'][indices].values
-                    one_d = self.grid_data_ses3d.df['one_d_{}'.format(component)][indices].values
+                    one_d = ses3d_dmn.df[:]['one_d_{}'.format(component)]
                     ses3d_dmn.df[:][component] = ((one_d + self.grid_data_ses3d.df[component][indices].values) * taper) + \
                                                  (1 - taper) * ses3d_dmn.df[:][component]
                 else:
@@ -122,7 +122,10 @@ class Ses3d_rbf(Ses3d):
                 if self.model_info['component_type'] == 'perturbation':
                     if self.model_info['taper'] and component != 'taper':
                         taper = ses3d_dmn.df['taper'].values[i]
+                        one_d = ses3d_dmn.df['one_d_{}'.format(component)].values[i]
                         ses3d_dmn.df[component].values[i] += (taper * val)
+                        ses3d_dmn.df[component].values[i] = (one_d + val) * taper + \
+                                                            (1 - taper) * ses3d_dmn.df[component].values[i]
                     else:
                         ses3d_dmn.df[component].values[i] += val
                 elif self.model_info['component_type'] == 'absolute':

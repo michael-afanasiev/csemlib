@@ -178,6 +178,13 @@ class FibonacciGrid:
             raise ValueError('Incorrect type specified in FibonacciGrid.get_coordinates')
 
     def rotate(self, angle, x, y, z):
+        """
+        :param angle: rotation angle
+        :param x: rotation vector x-component
+        :param y: rotation vector y-component
+        :param z: rotation vector z-component
+        :return:
+        """
         rot_mat = get_rot_matrix(angle, x, y, z)
         self._x, self._y, self._z = rotate(self._x, self._y, self._z, rot_mat)
 
