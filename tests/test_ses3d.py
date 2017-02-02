@@ -50,6 +50,10 @@ def test_ses3d_griddata():
     mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
     mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
 
+    mod.model_info['component_type'] = 'perturbation'
+    mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
+    mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
+    
     # Write vtk
     x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
     elements = triangulate(x, y, z)

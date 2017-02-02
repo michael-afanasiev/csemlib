@@ -251,7 +251,7 @@ def test_add_crust_and_s20rts_prem():
 
     # Evaluate Crust
     cst = crust.Crust()
-    pts = cst.eval_point_cloud_grid_data(grid_data)
+    cst.eval_point_cloud_grid_data(grid_data)
 
     # Generate mesh for plotting (normalised coordinates)
     x, y, z = grid_data.get_coordinates(coordinate_type='cartesian').T
