@@ -1,20 +1,26 @@
 geometry:
-  rmin: 5771.0
-  rmax: 6371.0
-  cmin: 30.0
-  cmax: 75.0
-  lmin: 115.0
-  lmax: 160.0
+  rmin: 5400.0
+  rmax: 6300.0
+  cmin: 50.0
+  cmax: 51.5
+  lmin: 50.0
+  lmax: 51.5.0
   rotation: False
   rot_x: 0
   rot_y: 0
   rot_z: 0
   rot_angle: 0
 component_type: perturbation
+region_info:
+  num_regions: 3
+  region_0_top: 6300.0
+  region_0_bottom: 6100.0
+  region_1_top: 6100.0
+  region_1_bottom: 6000.0
+  region_2_top: 6000.0
+  region_2_bottom: 5400.0
 components:
-  - rho
-  - vp
-  - vsh
   - vsv
-model: japan_saule
+taper: False
+model: multi_region_ses3d
 reference: put_paper_reference_here

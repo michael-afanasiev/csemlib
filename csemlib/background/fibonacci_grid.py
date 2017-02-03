@@ -104,8 +104,8 @@ class FibonacciGrid:
         pts = np.array((r, c, l)).T
 
         # Extract r_domain
-        below_domain = pts[pts[:, 0] < r_min]
-        above_domain = pts[pts[:, 0] > r_max]
+        below_domain = pts[pts[:, 0] < r_min - np.finfo(float).eps]
+        above_domain = pts[pts[:, 0] > r_max + np.finfo(float).eps]
         r_domain = pts[pts[:, 0] <= r_max]
         r_domain = r_domain[r_domain[:, 0] >= r_min]
         # Append points that fall outside of domain
@@ -178,6 +178,13 @@ class FibonacciGrid:
             raise ValueError('Incorrect type specified in FibonacciGrid.get_coordinates')
 
     def rotate(self, angle, x, y, z):
+        """
+        :param angle: rotation angle
+        :param x: rotation vector x-component
+        :param y: rotation vector y-component
+        :param z: rotation vector z-component
+        :return:
+        """
         rot_mat = get_rot_matrix(angle, x, y, z)
         self._x, self._y, self._z = rotate(self._x, self._y, self._z, rot_mat)
 

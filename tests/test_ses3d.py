@@ -40,14 +40,17 @@ def test_ses3d_griddata():
 
     # Setup GridData
     grid_data = GridData(*fib_grid.get_coordinates())
-
+    grid_data.add_one_d()
     # Evaluate Prem
-    rho, vpv, vsv, vsh = prem_eval_point_cloud(grid_data.df['r'])
     grid_data.set_component('vsv', np.ones(len(grid_data)))
 
     mod = Ses3d_rbf('japan', os.path.join(TEST_DATA_DIR, 'japan'),
                     components=grid_data.components, interp_method='nearest_neighbour')
     mod.eval_point_cloud_griddata(grid_data)
+    mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
+    mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
+
+    mod.model_info['component_type'] = 'perturbation'
     mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
     mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
 
@@ -133,7 +136,7 @@ def test_ses3d_multi_region_write():
     shutil.rmtree(new_write_dir)
 
 
-def test_ses3d():
+def test_ses3d_enclosing_element_interpolation():
     """
     Test to ensure that a ses3d model returns itself.
     """
@@ -173,15 +176,15 @@ def test_ses3d_griddata_return_itself():
 
     grid_data = GridData(mod.data()['x'].values.ravel(), mod.data()['y'].values.ravel(), mod.data()['z'].values.ravel(), coord_system='cartesian')
     grid_data.add_components(['vsv', 'rho', 'vsh', 'vp'])
-
     mod.eval_point_cloud_griddata(grid_data)
 
     # Setup true data.
     true = np.empty((len(all_cols.ravel()), 4))
-    true[:, 0] = mod.data()['vsv'].values.ravel()
-    true[:, 1] = mod.data()['rho'].values.ravel()
-    true[:, 2] = mod.data()['vsh'].values.ravel()
-    true[:, 3] = mod.data()['vp'].values.ravel()
+    taper = mod.data()['taper'].values.ravel()
+    true[:, 0] = mod.data()['vsv'].values.ravel() * taper
+    true[:, 1] = mod.data()['rho'].values.ravel() * taper
+    true[:, 2] = mod.data()['vsh'].values.ravel() * taper
+    true[:, 3] = mod.data()['vp'].values.ravel() * taper
 
     interp = np.empty((len(all_cols.ravel()), 4))
     interp[:, 0] = grid_data.get_component('vsv')
@@ -191,3 +194,38 @@ def test_ses3d_griddata_return_itself():
 
     np.testing.assert_almost_equal(true, grid_data.get_data(), decimal=DECIMAL_CLOSE)
 
+
+def test_hdf5_writer():
+    """
+    Write an hdf5 file
+    :return:
+    """
+    mod = s3d.Ses3d('europe', os.path.join(TEST_DATA_DIR, 'japan'), components=['rho', 'vp', 'vsh', 'vsv'])
+    mod.read()
+
+    mod.write_to_hdf5()
+
+def test_rotation():
+
+    #  Generate visualisation grid
+    fib_grid = FibonacciGrid()
+    # Set global background grid
+    radii = np.linspace(6271.0, 6271.0, 1)
+    resolution = np.ones_like(radii) * 300
+    fib_grid.set_global_sphere(radii, resolution)
+
+    grid_data = GridData(*fib_grid.get_coordinates())
+    grid_data.add_one_d()
+    grid_data.set_component('vsv', np.zeros(len(grid_data)))
+
+    mod = s3d.Ses3d('test_region', os.path.join(os.path.join(TEST_DATA_DIR,
+        'test_region')), components=['vsv'])
+    mod.eval_point_cloud_griddata(grid_data)
+
+    mod = Ses3d_rbf('test_region', os.path.join(os.path.join(TEST_DATA_DIR,
+        'test_region')), components=['vsv'])
+    mod.eval_point_cloud_griddata(grid_data, interp_method='radial_basis_func')
+    mod.eval_point_cloud_griddata(grid_data, interp_method='griddata_linear')
+    mod.eval_point_cloud_griddata(grid_data)
+    grid_data.del_one_d()
+    

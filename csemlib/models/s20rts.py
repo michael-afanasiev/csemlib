@@ -20,7 +20,7 @@ class S20rts(Model):
         directory, _ = os.path.split(os.path.split(__file__)[0])
         self.directory = os.path.join(directory, 'data', 's20rts')
         self.layers = np.array([6346.63, 6296.63, 6241.64, 6181.14, 6114.57, 6041.34, 5960.79,
-                                5872.18, 5774.69, 5667.44, 5549.46, 5419.68,5276.89, 5119.82,
+                                5872.18, 5774.69, 5667.44, 5549.46, 5419.68, 5276.89, 5119.82,
                                 4947.02, 4756.93, 4547.81, 4317.74, 4064.66, 3786.25, 3479.96])
         self.r_earth = 6371.0
 
@@ -127,7 +127,7 @@ class S20rts(Model):
         :param vsh: param to be returned - currently not used
         :return c, l, r, rho, vpv, vsv, vsh
         """
-        print('Evaluating S20rts')
+        print('Evaluating S20RTS')
         self.read()
         s20rts_dmn = self.split_domains_griddata(GridData)
 
